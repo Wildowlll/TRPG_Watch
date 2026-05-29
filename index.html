@@ -465,6 +465,7 @@ function showJoin(){$('jbox').classList.add('open');$('jcode').focus();}
 function hideJoin(){$('jbox').classList.remove('open');}
 function goStart(){
   if(myPeer){try{myPeer.close();}catch(e){}myPeer=null;}
+  stopKeepAlive();
   ['bgm','sfx'].forEach(c=>{
     if(ch[c].timer){clearInterval(ch[c].timer);ch[c].timer=null;}
     ch[c].player=null;ch[c].queue=[];ch[c].idx=-1;ch[c].playing=false;
@@ -495,8 +496,8 @@ function startGM(){
         wsSend(myPeer,{...buildSync(),to:msg.from});
       }
     },
-    ()=>toast('👑 세션 시작! 코드: '+sessionCode),
-    ()=>{if(role==='gm')toast('⚠️ 연결 끊김 — 새로고침 해주세요');}
+    ()=>{toast('👑 세션 시작! 코드: '+sessionCode);startKeepAlive();},
+    ()=>{if(role==='gm'){toast('⚠️ 연결 끊김 — 새로고침 해주세요');stopKeepAlive();}}
   );
 
   withYT(()=>{
@@ -913,10 +914,21 @@ function renderThemeDrop(el){
     </div>`).join('');
 }
 
+// ── 서버 슬립 방지 (Railway 무료 플랜) ──
+let keepAliveTimer=null;
+function startKeepAlive(){
+  if(keepAliveTimer)return;
+  keepAliveTimer=setInterval(()=>{
+    fetch('https://trpg-signal-production.up.railway.app/health').catch(()=>{});
+  },5*60*1000); // 5분마다 핑
+}
+function stopKeepAlive(){
+  if(keepAliveTimer){clearInterval(keepAliveTimer);keepAliveTimer=null;}
+}
+
 // ── 초기화 ──
 applyTheme(curTheme);
 $('jcode').addEventListener('keydown',e=>{if(e.key==='Enter')joinPL();});
-// Cloudflare Workers 시그널링 사용 중
 </script>
 </body>
 </html>
