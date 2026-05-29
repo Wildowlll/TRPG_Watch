@@ -563,25 +563,25 @@ const CHUNK=16*1024; // 16KB 청크
 const plRecv={};
 
 function sendFileToPL(conn,item,c,idx){
-  if(!item.fileData)return;
+  if(!item.fileData){toast('❌ 파일 데이터가 아직 로드 안 됐어요. 잠시 후 다시 시도해주세요.');return;}
   const buf=item.fileData;
   const total=buf.byteLength;
   const chunks=Math.ceil(total/CHUNK);
   const fileId=item.id;
 
-  // 전송 시작 알림
   wsSend(conn,{type:'file-start',fileId,fileName:item.fileName,fileType:item.fileType,fileSize:total,chunks,ch:c,idx});
 
   let i=0;
   function sendNext(){
-    if(i>=chunks){
-      wsSend(conn,{type:'file-end',fileId,ch:c,idx});
-      return;
-    }
+    if(i>=chunks){wsSend(conn,{type:'file-end',fileId,ch:c,idx});return;}
     const slice=buf.slice(i*CHUNK,Math.min((i+1)*CHUNK,total));
-    wsSend(conn,{type:'file-chunk',fileId,i,data:slice});
+    // ArrayBuffer → Base64 (큰 청크도 안전하게)
+    const u8=new Uint8Array(slice);
+    let bin='';
+    for(let j=0;j<u8.length;j++)bin+=String.fromCharCode(u8[j]);
+    const b64=btoa(bin);
+    wsSend(conn,{type:'file-chunk',fileId,i,data:b64});
     i++;
-    // 흐름 제어 — 조금씩 쉬어가며 전송
     setTimeout(sendNext,1);
   }
   sendNext();
@@ -929,7 +929,12 @@ function plFileStart(d){
 
 function plFileChunk(d){
   const r=plRecv[d.fileId];if(!r)return;
-  r.received[d.i]=d.data;r.count++;
+  // Base64 → ArrayBuffer 디코딩
+  const binary=atob(d.data);
+  const buf=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)buf[i]=binary.charCodeAt(i);
+  r.received[d.i]=buf.buffer;
+  r.count++;
   showXferBar(r.ch,r.count/r.chunks*100);
 }
 
