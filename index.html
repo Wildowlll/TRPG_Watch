@@ -824,6 +824,13 @@ function joinPL(){
   withYT(()=>{
     plP.bgm=makePlayer('pl-bgm-yt',70,e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-bgm-novid').style.display='none';});
     plP.sfx=makePlayer('pl-sfx-yt',80,e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-sfx-novid').style.display='none';});
+    // YT 플레이어 준비 완료 후 대기 중인 sync 적용
+    setTimeout(()=>{
+      if(plLastSync&&plAudioUnlocked){
+        plApply('bgm',plLastSync.bgm);
+        plApply('sfx',plLastSync.sfx);
+      }
+    },1000);
   });
 
   // 탭 복귀 시 강제 재동기화
@@ -836,11 +843,40 @@ function joinPL(){
   });
 }
 
+function plUnlockAudio(){
+  try{
+    plAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const buf=plAudioCtx.createBuffer(1,1,22050);
+    const src=plAudioCtx.createBufferSource();
+    src.buffer=buf;src.connect(plAudioCtx.destination);src.start(0);
+    plAudioCtx.resume().then(()=>{
+      plAudioUnlocked=true;
+      $('pl-unlock').style.display='none';
+      toast('✅ 오디오 활성화됨! 탭 전환해도 재생됩니다.');
+      // 언락 후 대기 중 sync 즉시 적용
+      if(plLastSync&&plP.bgm?.loadVideoById){
+        plApply('bgm',plLastSync.bgm);
+        plApply('sfx',plLastSync.sfx);
+      }
+    });
+  }catch(e){
+    plAudioUnlocked=true;
+    $('pl-unlock').style.display='none';
+    if(plLastSync&&plP.bgm?.loadVideoById){
+      plApply('bgm',plLastSync.bgm);
+      plApply('sfx',plLastSync.sfx);
+    }
+  }
+}
+
 function plHandle(d){
   if(!d||d.type!=='sync')return;
   plLastSync=d;
-  if(!plAudioUnlocked)return;
-  plApply('bgm',d.bgm);plApply('sfx',d.sfx);
+  // 언락됐고 플레이어 준비됐으면 바로 적용
+  if(plAudioUnlocked&&plP.bgm?.loadVideoById){
+    plApply('bgm',d.bgm);
+    plApply('sfx',d.sfx);
+  }
 }
 
 // ── PL 파일 수신 ──
