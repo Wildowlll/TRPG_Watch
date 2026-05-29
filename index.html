@@ -80,7 +80,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg0);color:var(--tex
 /* 플레이어 — 핵심 수정: position:relative + 내부 div absolute fill */
 .ch-yt{position:relative;background:#000;overflow:hidden;min-height:0;}
 .ch-yt-b{border-left:1px solid var(--bb);}
-.yt-inner{position:absolute;inset:0;}
+.yt-inner{position:absolute;inset:0;z-index:1;}
 .novid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;background:var(--bg1);z-index:2;pointer-events:none;}
 .novid-ico{font-size:24px;opacity:0.2;}
 .novid-txt{font-size:12px;color:var(--muted);}
@@ -454,9 +454,7 @@ function makePlayer(wrapperId,vol,onState,onReady){
   const innerId=wrapperId+'-player';
   const inner=document.createElement('div');
   inner.id=innerId;
-  // position:absolute로 부모를 꽉 채우기
-  inner.style.cssText='position:absolute;inset:0;width:100%;height:100%;';
-  wrap.style.position='relative';
+  inner.style.cssText='width:100%;height:100%;';
   wrap.appendChild(inner);
   return new YT.Player(innerId,{
     width:'100%',height:'100%',
@@ -1007,6 +1005,7 @@ function plApply(c,s){
   const st=plSt[c];
   if(s.videoId&&s.videoId!==st.vid){
     st.vid=s.videoId;
+    console.log('[plApply] loading video:', s.videoId, 'playing:', s.playing);
     if(s.playing){p.loadVideoById({videoId:s.videoId,startSeconds:s.time||0});}
     else{p.cueVideoById({videoId:s.videoId,startSeconds:s.time||0});}
     $('pl-'+c+'-novid').style.display='none';
