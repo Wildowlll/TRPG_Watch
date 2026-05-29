@@ -188,12 +188,7 @@ input[type=range]{cursor:pointer;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
 ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:2px;}
-/* 파일 전송 진행바 */
-.xfer-bar{position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--bg3);z-index:10;}
-.xfer-fill{height:100%;background:var(--green);border-radius:2px;transition:width 0.15s;}
-.xfer-label{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--green);background:rgba(0,0,0,0.65);padding:2px 8px;border-radius:10px;white-space:nowrap;z-index:11;pointer-events:none;}
-.qi-local{font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(76,175,125,0.15);color:var(--green);border:1px solid rgba(76,175,125,0.3);flex-shrink:0;}
-.qi-sending{font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(200,169,110,0.15);color:var(--a);border:1px solid var(--ba);flex-shrink:0;}
+
 </style>
 </head>
 <body>
@@ -299,8 +294,6 @@ input[type=range]{cursor:pointer;}
         <div class="addrow addrow-a">
           <input class="urlinp" id="bgm-inp" placeholder="YouTube URL 붙여넣기" onkeydown="if(event.key==='Enter')addTrack('bgm')">
           <button class="addbtn addbtn-a" onclick="addTrack('bgm')">+ URL</button>
-          <button class="addbtn addbtn-a" onclick="pickFile('bgm')" title="로컬 파일 (20MB 이하)">📂</button>
-          <input type="file" id="bgm-file" accept="audio/*,video/*" style="display:none" onchange="addFile('bgm',this)">
         </div>
         <div class="qlist" id="bgm-ql"></div>
       </div>
@@ -309,8 +302,6 @@ input[type=range]{cursor:pointer;}
         <div class="addrow addrow-b">
           <input class="urlinp urlinp-b" id="sfx-inp" placeholder="YouTube URL 붙여넣기" onkeydown="if(event.key==='Enter')addTrack('sfx')">
           <button class="addbtn addbtn-b" onclick="addTrack('sfx')">+ URL</button>
-          <button class="addbtn addbtn-b" onclick="pickFile('sfx')" title="로컬 파일 (20MB 이하)">📂</button>
-          <input type="file" id="sfx-file" accept="audio/*,video/*" style="display:none" onchange="addFile('sfx',this)">
         </div>
         <div class="qlist" id="sfx-ql"></div>
       </div>
@@ -477,8 +468,6 @@ function goStart(){
   ['bgm','sfx'].forEach(c=>{
     if(ch[c].timer){clearInterval(ch[c].timer);ch[c].timer=null;}
     ch[c].player=null;ch[c].queue=[];ch[c].idx=-1;ch[c].playing=false;
-    if(localAudio[c]){localAudio[c].pause();localAudio[c]=null;}
-    if(plLocalAudio[c]){plLocalAudio[c].pause();plLocalAudio[c]=null;}
   });
   plP.bgm=null;plP.sfx=null;plCount=0;role='';sessionCode='';
   plAudioUnlocked=false;plLastSync=null;
@@ -541,63 +530,16 @@ function gmState(c,e){
 }
 
 // ── 파일 추가 ──
-const MAX_FILE=20*1024*1024; // 20MB
-function pickFile(c){$(c+'-file').click();}
-function addFile(c,input){
-  const file=input.files[0];input.value='';
-  if(!file)return;
-  if(file.size>MAX_FILE){toast('❌ 20MB 이하 파일만 가능해요 ('+Math.round(file.size/1024/1024*10)/10+'MB)');return;}
-  const localUrl=URL.createObjectURL(file);
-  const item={id:'local-'+Date.now(),title:file.name,loop:false,isLocal:true,localUrl,fileName:file.name,fileSize:file.size,fileType:file.type,fileData:null};
-  // 파일 데이터 읽어두기 (PL 전송용)
-  const reader=new FileReader();
-  reader.onload=e=>{item.fileData=e.target.result;};
-  reader.readAsArrayBuffer(file);
-  ch[c].queue.push(item);
-  renderQ(c);saveSc();toast('✅ 로컬 파일 추가됨: '+file.name);
-}
 
-// ── 파일 전송 (GM→PL) ──
-const CHUNK=16*1024; // 16KB 청크
-// PL별 수신 버퍼
-const plRecv={};
 
-function sendFileToPL(conn,item,c,idx){
-  if(!item.fileData){toast('❌ 파일 데이터가 아직 로드 안 됐어요. 잠시 후 다시 시도해주세요.');return;}
-  const buf=item.fileData;
-  const total=buf.byteLength;
-  const chunks=Math.ceil(total/CHUNK);
-  const fileId=item.id;
 
-  wsSend(conn,{type:'file-start',fileId,fileName:item.fileName,fileType:item.fileType,fileSize:total,chunks,ch:c,idx});
-
-  let i=0;
-  function sendNext(){
-    if(i>=chunks){wsSend(conn,{type:'file-end',fileId,ch:c,idx});return;}
-    const slice=buf.slice(i*CHUNK,Math.min((i+1)*CHUNK,total));
-    // ArrayBuffer → Base64 (큰 청크도 안전하게)
-    const u8=new Uint8Array(slice);
-    let bin='';
-    for(let j=0;j<u8.length;j++)bin+=String.fromCharCode(u8[j]);
-    const b64=btoa(bin);
-    wsSend(conn,{type:'file-chunk',fileId,i,data:b64});
-    i++;
-    setTimeout(sendNext,1);
-  }
-  sendNext();
-}
-
-function gmSendFileToAll(item,c,idx){
-  // Workers를 통해 브로드캐스트 (파일은 청크로 분할 전송)
-  sendFileToPL(myPeer,item,c,idx);
-}
 
 // ── 큐 ──
 async function addTrack(c){
   const inp=$(c+'-inp'),url=inp.value.trim();
   if(!url){toast('URL을 입력하세요');return;}
   const id=ytId(url);if(!id){toast('❌ 유효한 YouTube URL 아님');return;}
-  const item={id,title:'로딩 중...',loop:false,isLocal:false};
+  const item={id,title:'로딩 중...',loop:false};
   ch[c].queue.push(item);inp.value='';
   renderQ(c);toast('✅ 추가됨');
   try{
@@ -610,17 +552,14 @@ async function addTrack(c){
 function renderQ(c){
   const C=ch[c],el=$(c+'-ql');
   $(c+'-qcnt').textContent=C.queue.length+'개';
-  if(!C.queue.length){el.innerHTML='<div class="empty-q">YouTube URL 또는 📂 로컬 파일을 추가해보세요</div>';return;}
+  if(!C.queue.length){el.innerHTML='<div class="empty-q">YouTube URL을 추가해보세요</div>';return;}
   el.innerHTML=C.queue.map((item,i)=>`
     <div class="qi ${i===C.idx?'on-'+c:''}" draggable="true" data-ch="${c}" data-i="${i}" onclick="gmPlayIdx('${c}',${i})">
       <span class="qi-drag">⠿</span>
       <span class="qi-num">${i===C.idx?'▶':i+1}</span>
-      ${item.isLocal
-        ?`<div style="width:43px;height:27px;background:var(--bg3);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">🎵</div>`
-        :`<img class="qi-thumb" src="https://img.youtube.com/vi/${item.id}/mqdefault.jpg" onerror="this.style.display='none'">`
-      }
-      <div class="qi-info"><div class="qi-ttl">${item.title}</div><div class="qi-id">${item.isLocal?'로컬 파일 · '+Math.round(item.fileSize/1024/1024*10)/10+'MB':item.id}</div></div>
-      ${item.isLocal?`<span class="qi-local">LOCAL</span>`:''}
+      <img class="qi-thumb" src="https://img.youtube.com/vi/\${item.id}/mqdefault.jpg" onerror="this.style.display='none'">
+      <div class="qi-info"><div class="qi-ttl">${item.title}</div>
+      <div class="qi-id">\${item.id}</div></div>
       <button class="qi-loop ${item.loop?'on':''}" onclick="event.stopPropagation();toggleTL('${c}',${i})">${item.loop?'🔁':'↩'}</button>
       <button class="qi-del" onclick="event.stopPropagation();delTrack('${c}',${i})">✕</button>
     </div>`).join('');
@@ -659,61 +598,8 @@ function delTrack(c,i){
   renderQ(c);saveSc();
 }
 
-// GM 플레이어 — 로컬 파일 처리 포함
-const localAudio={bgm:null,sfx:null}; // <audio> 엘리먼트
+// GM 플레이어
 
-function gmPlayIdx(c,i){
-  const C=ch[c];
-  if(i<0||i>=C.queue.length)return;
-  C.idx=i;
-  const item=C.queue[i];
-  $(c+'-now').textContent=item.title;
-  $(c+'-novid').style.display='none';
-  renderQ(c);
-
-  if(item.isLocal){
-    // 로컬 파일: YT 플레이어 숨기고 Audio API 사용
-    if(C.player)C.player.stopVideo&&C.player.stopVideo();
-    playLocalAudio(c,item);
-    // PL에게 파일 전송 후 재생 신호
-    if(plCount>0){
-      toast('📤 PL에게 파일 전송 중...');
-      gmSendFileToAll(item,c,i);
-    }
-  } else {
-    // 유튜브
-    stopLocalAudio(c);
-    if(!C.player||!C.player.loadVideoById)return;
-    C.player.loadVideoById(item.id);
-  }
-}
-
-function playLocalAudio(c,item){
-  stopLocalAudio(c);
-  const audio=new Audio(item.localUrl);
-  audio.volume=(c==='bgm'?parseInt($('bgm-vol').value):parseInt($('sfx-vol').value))/100;
-  audio.loop=item.loop;
-  audio.play().catch(e=>toast('재생 오류: '+e.message));
-  localAudio[c]=audio;
-
-  // 진행바 업데이트
-  const C=ch[c];C.playing=true;$(c+'-pb').textContent='⏸';
-  startLocalTimer(c,audio);
-
-  audio.addEventListener('ended',()=>{
-    C.playing=false;$(c+'-pb').textContent='▶';stopTimer(c);
-    if(!item.loop){
-      if(c==='sfx'&&C.loop)gmPlayIdx(c,(C.idx+1)%C.queue.length);
-      else gmNext(c);
-    }
-  });
-  gmBroadcast(buildSync());
-}
-
-function stopLocalAudio(c){
-  if(localAudio[c]){localAudio[c].pause();localAudio[c]=null;}
-  stopTimer(c);
-}
 
 function startLocalTimer(c,audio){
   stopTimer(c);
@@ -725,15 +611,7 @@ function startLocalTimer(c,audio){
   },500);
 }
 
-function gmToggle(c){
-  const C=ch[c];
-  if(localAudio[c]){
-    if(C.playing){localAudio[c].pause();C.playing=false;$(c+'-pb').textContent='▶';}
-    else{localAudio[c].play();C.playing=true;$(c+'-pb').textContent='⏸';}
-    gmBroadcast(buildSync());return;
-  }
-  if(!C.player)return;C.playing?C.player.pauseVideo():C.player.playVideo();
-}
+function gmToggle(c){const C=ch[c];if(!C.player)return;C.playing?C.player.pauseVideo():C.player.playVideo();}
 function gmNext(c){const C=ch[c];if(C.idx<C.queue.length-1)gmPlayIdx(c,C.idx+1);}
 function gmPrev(c){const C=ch[c];if(C.idx>0)gmPlayIdx(c,C.idx-1);}
 function gmToggleLoop(c){
@@ -741,19 +619,8 @@ function gmToggleLoop(c){
   $(c+'-lb').classList.toggle(c==='bgm'?'on-a':'on-b',ch[c].loop);
   toast(ch[c].loop?'🔁 채널 루프 ON':'↩ 채널 루프 OFF');
 }
-function gmSeek(c,e){
-  const r=e.currentTarget.getBoundingClientRect();
-  const pct=(e.clientX-r.left)/r.width;
-  if(localAudio[c]&&localAudio[c].duration){localAudio[c].currentTime=pct*localAudio[c].duration;gmBroadcast(buildSync());return;}
-  const C=ch[c];if(!C.player)return;
-  C.player.seekTo(pct*(C.player.getDuration()||0),true);
-  setTimeout(()=>gmBroadcast(buildSync()),300);
-}
-function gmVol(c,v){
-  $(c+'-vv').textContent=v;
-  if(localAudio[c])localAudio[c].volume=v/100;
-  if(ch[c].player)ch[c].player.setVolume(+v);
-}
+function gmSeek(c,e){const C=ch[c];if(!C.player)return;const r=e.currentTarget.getBoundingClientRect();C.player.seekTo(((e.clientX-r.left)/r.width)*(C.player.getDuration()||0),true);setTimeout(()=>gmBroadcast(buildSync()),300);}
+function gmVol(c,v){$(c+'-vv').textContent=v;if(ch[c].player)ch[c].player.setVolume(+v);}
 
 function startTimer(c){
   stopTimer(c);
@@ -766,22 +633,7 @@ function startTimer(c){
 }
 function stopTimer(c){if(ch[c].timer){clearInterval(ch[c].timer);ch[c].timer=null;}}
 
-function buildSync(){
-  const snap=c=>{
-    const C=ch[c];
-    const item=C.idx>=0?C.queue[C.idx]:null;
-    const cur=localAudio[c]?localAudio[c].currentTime:(C.player?.getCurrentTime?.()||0);
-    return{
-      playing:C.playing,
-      videoId:item&&!item.isLocal?item.id:'',
-      fileId:item&&item.isLocal?item.id:'',
-      title:item?item.title:'',
-      time:cur,
-      ts:Date.now()
-    };
-  };
-  return{type:'sync',bgm:snap('bgm'),sfx:snap('sfx'),ts:Date.now()};
-}
+function buildSync(){const snap=c=>{const C=ch[c];return{playing:C.playing,videoId:C.idx>=0?C.queue[C.idx].id:'',title:C.idx>=0?C.queue[C.idx].title:'',time:C.player?.getCurrentTime?.()||0,ts:Date.now()};};return{type:'sync',bgm:snap('bgm'),sfx:snap('sfx'),ts:Date.now()};}
 function gmBroadcast(msg){wsSend(myPeer,msg);}
 function gmForceSync(){gmBroadcast(buildSync());toast('🔄 동기화 전송');}
 function copyCode(){navigator.clipboard.writeText(sessionCode).then(()=>toast('📋 코드 복사: '+sessionCode));}
@@ -827,9 +679,6 @@ function joinPL(){
   myPeer=mkWS(code,plId,
     msg=>{
       if(msg.type==='sync'){plHandle(msg);}
-      else if(msg.type==='file-start') plFileStart(msg);
-      else if(msg.type==='file-chunk') plFileChunk(msg);
-      else if(msg.type==='file-end')   plFileEnd(msg);
       else if(msg.type==='peer-join'&&msg.peerId==='GM'){
         wsSend(myPeer,{type:'sync-req',to:'GM'});
       }
@@ -916,121 +765,11 @@ function plHandle(d){
   }
 }
 
-// ── PL 파일 수신 ──
-function plFileStart(d){
-  plRecv[d.fileId]={
-    fileName:d.fileName,fileType:d.fileType,fileSize:d.fileSize,
-    chunks:d.chunks,received:[],count:0,ch:d.ch,idx:d.idx
-  };
-  // 진행바 표시
-  showXferBar(d.ch,0);
-  toast('📥 파일 수신 중: '+d.fileName);
-}
 
-function plFileChunk(d){
-  const r=plRecv[d.fileId];if(!r)return;
-  // Base64 → ArrayBuffer 디코딩
-  const binary=atob(d.data);
-  const buf=new Uint8Array(binary.length);
-  for(let i=0;i<binary.length;i++)buf[i]=binary.charCodeAt(i);
-  r.received[d.i]=buf.buffer;
-  r.count++;
-  showXferBar(r.ch,r.count/r.chunks*100);
-}
-
-function plFileEnd(d){
-  const r=plRecv[d.fileId];if(!r)return;
-  hideXferBar(r.ch);
-
-  // 빠진 청크 확인
-  if(r.count!==r.chunks){
-    toast('⚠️ 파일 수신 불완전 ('+r.count+'/'+r.chunks+'). 다시 시도해주세요.');
-    delete plRecv[d.fileId];return;
-  }
-
-  // 순서대로 정렬해서 Blob 조립
-  const ordered=[];
-  for(let i=0;i<r.chunks;i++){
-    if(!r.received[i]){toast('⚠️ 청크 '+i+' 누락. 다시 시도해주세요.');delete plRecv[d.fileId];return;}
-    ordered.push(r.received[i]);
-  }
-
-  const blob=new Blob(ordered,{type:r.fileType||'audio/mpeg'});
-  const url=URL.createObjectURL(blob);
-  plLocalFiles[d.fileId]={url,blob};
-  delete plRecv[d.fileId];
-  toast('✅ 파일 수신 완료: '+r.fileName);
-
-  const pending=plPendingSync[r.ch];
-  const last=plLastSync?plLastSync[r.ch]:null;
-
-  if(pending&&pending.fileId===d.fileId){
-    plApply(r.ch,pending);
-    delete plPendingSync[r.ch];
-  } else if(last&&last.fileId===d.fileId){
-    plApply(r.ch,last);
-  } else {
-    const audio=new Audio(url);
-    audio._fileId=d.fileId;
-    audio.volume=parseInt($(r.ch==='bgm'?'pl-bgm-vol':'pl-sfx-vol').value)/100;
-    if(plLocalAudio[r.ch])plLocalAudio[r.ch].pause();
-    plLocalAudio[r.ch]=audio;
-    const ytWrap=$(r.ch==='bgm'?'pl-bgm-yt':'pl-sfx-yt');
-    if(ytWrap)ytWrap.style.display='none';
-    $('pl-'+r.ch+'-novid').style.display='none';
-    audio.play().catch(e=>toast('재생 오류: '+e.message));
-  }
-}
-
-const plLocalFiles={};  // fileId → {url, blob}
-const plPendingSync={bgm:null,sfx:null};
-const plLocalAudio={bgm:null,sfx:null};
-
-function showXferBar(c,pct){
-  let wrap=$(c==='bgm'?'pl-bgm-yt':'pl-sfx-yt').parentElement;
-  let bar=wrap.querySelector('.xfer-bar');
-  if(!bar){
-    bar=document.createElement('div');bar.className='xfer-bar';
-    bar.innerHTML='<div class="xfer-fill" style="width:0%"></div>';
-    const lbl=document.createElement('div');lbl.className='xfer-label';lbl.id=c+'-xfer-lbl';
-    wrap.appendChild(bar);wrap.appendChild(lbl);
-  }
-  bar.querySelector('.xfer-fill').style.width=pct+'%';
-  const lbl=$(c+'-xfer-lbl');if(lbl)lbl.textContent='수신 중... '+Math.round(pct)+'%';
-}
-function hideXferBar(c){
-  const wrap=$(c==='bgm'?'pl-bgm-yt':'pl-sfx-yt').parentElement;
-  wrap.querySelectorAll('.xfer-bar,.xfer-label').forEach(e=>e.remove());
-}
 
 function plApply(c,s){
   if(!s)return;
   if(s.title)$('pl-'+c+'-ttl').textContent=s.title;
-
-  // 로컬 파일
-  if(s.fileId){
-    const f=plLocalFiles[s.fileId];
-    if(!f){plPendingSync[c]=s;return;}
-    if(!plLocalAudio[c]||plLocalAudio[c]._fileId!==s.fileId){
-      if(plLocalAudio[c])plLocalAudio[c].pause();
-      const audio=new Audio(f.url);
-      audio._fileId=s.fileId;
-      audio.volume=parseInt($(c==='bgm'?'pl-bgm-vol':'pl-sfx-vol').value)/100;
-      plLocalAudio[c]=audio;
-      // 로컬 파일 재생 시 YT 플레이어 숨기기
-      const ytWrap=$(c==='bgm'?'pl-bgm-yt':'pl-sfx-yt');
-      if(ytWrap)ytWrap.style.display='none';
-      $('pl-'+c+'-novid').style.display='none';
-    }
-    const audio=plLocalAudio[c];
-    const local=audio.currentTime||0;
-    if(Math.abs((s.time||0)-local)>2)audio.currentTime=s.time||0;
-    s.playing?audio.play().catch(()=>{}):audio.pause();
-    return;
-  }
-
-  // 유튜브
-  if(plLocalAudio[c]){plLocalAudio[c].pause();plLocalAudio[c]=null;}
   const p=plP[c];if(!p?.loadVideoById)return;
   const st=plSt[c];
   if(s.videoId&&s.videoId!==st.vid){
@@ -1045,11 +784,7 @@ function plApply(c,s){
   }
   st.ts=s.ts;
 }
-function plVol(c,v){
-  $('pl-'+c+'-vv').textContent=v;
-  if(plLocalAudio[c])plLocalAudio[c].volume=v/100;
-  if(plP[c])plP[c].setVolume(+v);
-}
+function plVol(c,v){$('pl-'+c+'-vv').textContent=v;if(plP[c])plP[c].setVolume(+v);}
 
 // ── 시나리오 ──
 const SC_KEY='trpg-sc-v5';
