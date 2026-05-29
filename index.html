@@ -941,13 +941,26 @@ function plFileChunk(d){
 function plFileEnd(d){
   const r=plRecv[d.fileId];if(!r)return;
   hideXferBar(r.ch);
-  const blob=new Blob(r.received,{type:r.fileType});
+
+  // 빠진 청크 확인
+  if(r.count!==r.chunks){
+    toast('⚠️ 파일 수신 불완전 ('+r.count+'/'+r.chunks+'). 다시 시도해주세요.');
+    delete plRecv[d.fileId];return;
+  }
+
+  // 순서대로 정렬해서 Blob 조립
+  const ordered=[];
+  for(let i=0;i<r.chunks;i++){
+    if(!r.received[i]){toast('⚠️ 청크 '+i+' 누락. 다시 시도해주세요.');delete plRecv[d.fileId];return;}
+    ordered.push(r.received[i]);
+  }
+
+  const blob=new Blob(ordered,{type:r.fileType||'audio/mpeg'});
   const url=URL.createObjectURL(blob);
   plLocalFiles[d.fileId]={url,blob};
   delete plRecv[d.fileId];
   toast('✅ 파일 수신 완료: '+r.fileName);
 
-  // 대기 중인 sync로 재생 시도 (여러 경로)
   const pending=plPendingSync[r.ch];
   const last=plLastSync?plLastSync[r.ch]:null;
 
@@ -957,12 +970,13 @@ function plFileEnd(d){
   } else if(last&&last.fileId===d.fileId){
     plApply(r.ch,last);
   } else {
-    // fileId 매칭 안 되면 직접 재생
     const audio=new Audio(url);
     audio._fileId=d.fileId;
     audio.volume=parseInt($(r.ch==='bgm'?'pl-bgm-vol':'pl-sfx-vol').value)/100;
     if(plLocalAudio[r.ch])plLocalAudio[r.ch].pause();
     plLocalAudio[r.ch]=audio;
+    const ytWrap=$(r.ch==='bgm'?'pl-bgm-yt':'pl-sfx-yt');
+    if(ytWrap)ytWrap.style.display='none';
     $('pl-'+r.ch+'-novid').style.display='none';
     audio.play().catch(e=>toast('재생 오류: '+e.message));
   }
@@ -1003,6 +1017,9 @@ function plApply(c,s){
       audio._fileId=s.fileId;
       audio.volume=parseInt($(c==='bgm'?'pl-bgm-vol':'pl-sfx-vol').value)/100;
       plLocalAudio[c]=audio;
+      // 로컬 파일 재생 시 YT 플레이어 숨기기
+      const ytWrap=$(c==='bgm'?'pl-bgm-yt':'pl-sfx-yt');
+      if(ytWrap)ytWrap.style.display='none';
       $('pl-'+c+'-novid').style.display='none';
     }
     const audio=plLocalAudio[c];
