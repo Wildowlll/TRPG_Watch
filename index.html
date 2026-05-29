@@ -935,6 +935,7 @@ function hideXferBar(c){
 }
 
 function plApply(c,s){
+  console.log('plApply', c, s?.videoId, 'player:', !!plP[c]?.loadVideoById, 'unlocked:', plAudioUnlocked);  // ← 이 줄 추가
   if(!s)return;
   if(s.title)$('pl-'+c+'-ttl').textContent=s.title;
 
