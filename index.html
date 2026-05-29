@@ -558,9 +558,9 @@ function renderQ(c){
     <div class="qi ${i===C.idx?'on-'+c:''}" draggable="true" data-ch="${c}" data-i="${i}" onclick="gmPlayIdx('${c}',${i})">
       <span class="qi-drag">⠿</span>
       <span class="qi-num">${i===C.idx?'▶':i+1}</span>
-      <img class="qi-thumb" src="https://img.youtube.com/vi/\${item.id}/mqdefault.jpg" onerror="this.style.display='none'">
+      <img class="qi-thumb" src="https://img.youtube.com/vi/${item.id}/mqdefault.jpg" onerror="this.style.display='none'">
       <div class="qi-info"><div class="qi-ttl">${item.title}</div>
-      <div class="qi-id">\${item.id}</div></div>
+      <div class="qi-id">${item.id}</div></div>
       <button class="qi-loop ${item.loop?'on':''}" onclick="event.stopPropagation();toggleTL('${c}',${i})">${item.loop?'🔁':'↩'}</button>
       <button class="qi-del" onclick="event.stopPropagation();delTrack('${c}',${i})">✕</button>
     </div>`).join('');
