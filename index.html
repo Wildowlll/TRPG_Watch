@@ -941,17 +941,30 @@ function plFileChunk(d){
 function plFileEnd(d){
   const r=plRecv[d.fileId];if(!r)return;
   hideXferBar(r.ch);
-  // Blob 조립
   const blob=new Blob(r.received,{type:r.fileType});
   const url=URL.createObjectURL(blob);
-  // PL 로컬 오디오 저장
   plLocalFiles[d.fileId]={url,blob};
   delete plRecv[d.fileId];
   toast('✅ 파일 수신 완료: '+r.fileName);
-  // 대기 중인 sync가 있으면 재생
-  if(plPendingSync[r.ch]&&plPendingSync[r.ch].fileId===d.fileId){
-    plApply(r.ch,plPendingSync[r.ch]);
+
+  // 대기 중인 sync로 재생 시도 (여러 경로)
+  const pending=plPendingSync[r.ch];
+  const last=plLastSync?plLastSync[r.ch]:null;
+
+  if(pending&&pending.fileId===d.fileId){
+    plApply(r.ch,pending);
     delete plPendingSync[r.ch];
+  } else if(last&&last.fileId===d.fileId){
+    plApply(r.ch,last);
+  } else {
+    // fileId 매칭 안 되면 직접 재생
+    const audio=new Audio(url);
+    audio._fileId=d.fileId;
+    audio.volume=parseInt($(r.ch==='bgm'?'pl-bgm-vol':'pl-sfx-vol').value)/100;
+    if(plLocalAudio[r.ch])plLocalAudio[r.ch].pause();
+    plLocalAudio[r.ch]=audio;
+    $('pl-'+r.ch+'-novid').style.display='none';
+    audio.play().catch(e=>toast('재생 오류: '+e.message));
   }
 }
 
