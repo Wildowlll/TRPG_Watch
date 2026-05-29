@@ -404,7 +404,7 @@ const ch={
 let role='',myPeer=null,sessionCode='';
 let plCount=0; // 연결된 PL 수
 // ── Cloudflare Workers WebSocket 시그널링 ──
-const SIG='wss://trpg-signal-production.up.railway.app';
+const SIG='wss://trpg-signal-holy-feather-3663.fly.dev';
 function mkWS(sid,pid,onMsg,onOpen,onClose){
   const ws=new WebSocket(SIG+'/ws?session='+encodeURIComponent(sid)+'&peer='+encodeURIComponent(pid));
   ws.addEventListener('open',onOpen||(()=>{}));
@@ -930,7 +930,7 @@ let keepAliveTimer=null;
 function startKeepAlive(){
   if(keepAliveTimer)return;
   keepAliveTimer=setInterval(()=>{
-    fetch('https://trpg-signal-production.up.railway.app/health').catch(()=>{});
+    fetch('https://trpg-signal-holy-feather-3663.fly.dev/health').catch(()=>{});
   },5*60*1000); // 5분마다 핑
 }
 function stopKeepAlive(){
