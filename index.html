@@ -612,6 +612,17 @@ function startLocalTimer(c,audio){
   },500);
 }
 
+// GM 플레이어
+function gmPlayIdx(c,i){
+  const C=ch[c];
+  if(i<0||i>=C.queue.length)return;
+  C.idx=i;
+  if(!C.player||!C.player.loadVideoById)return;
+  C.player.loadVideoById(C.queue[i].id);
+  $(c+'-now').textContent=C.queue[i].title;
+  $(c+'-novid').style.display='none';
+  renderQ(c);
+}
 function gmToggle(c){const C=ch[c];if(!C.player)return;C.playing?C.player.pauseVideo():C.player.playVideo();}
 function gmNext(c){const C=ch[c];if(C.idx<C.queue.length-1)gmPlayIdx(c,C.idx+1);}
 function gmPrev(c){const C=ch[c];if(C.idx>0)gmPlayIdx(c,C.idx-1);}
