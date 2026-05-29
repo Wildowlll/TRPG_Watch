@@ -930,12 +930,24 @@ function plApply(c,s){
   const p=plP[c];if(!p?.loadVideoById)return;
   const st=plSt[c];
   if(s.videoId&&s.videoId!==st.vid){
-    st.vid=s.videoId;p.loadVideoById({videoId:s.videoId,startSeconds:s.time||0});
+    st.vid=s.videoId;
+    // loadVideoById는 자동재생 포함, startSeconds로 시작 위치 지정
+    if(s.playing){
+      p.loadVideoById({videoId:s.videoId,startSeconds:s.time||0});
+    } else {
+      p.cueVideoById({videoId:s.videoId,startSeconds:s.time||0});
+    }
     $('pl-'+c+'-novid').style.display='none';
   } else if(s.videoId&&s.ts!==st.ts){
-    const local=p.getCurrentTime?.()??0;if(Math.abs((s.time||0)-local)>2)p.seekTo(s.time||0,true);
+    const local=p.getCurrentTime?.()??0;
+    if(Math.abs((s.time||0)-local)>2)p.seekTo(s.time||0,true);
+    // 재생 상태 맞추기 — 약간 딜레이 줘서 플레이어 준비 후 실행
+    setTimeout(()=>{
+      if(s.playing){p.playVideo?.();}
+      else{p.pauseVideo?.();}
+    },300);
   }
-  s.playing?p.playVideo?.():p.pauseVideo?.();st.ts=s.ts;
+  st.ts=s.ts;
 }
 function plVol(c,v){
   $('pl-'+c+'-vv').textContent=v;
