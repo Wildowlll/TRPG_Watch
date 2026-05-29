@@ -227,7 +227,7 @@ input[type=range]{cursor:pointer;}
       <button class="btn btn-g" onclick="hideJoin()">취소</button>
     </div>
   </div>
-  <div class="notice">📡 PeerJS P2P — 가입·설치·서버 불필요<br>GitHub Pages에 index.html 하나만 올리면 돼요</div>
+  <div class="notice">📡 Cloudflare Workers 시그널링 — 안정적인 실시간 연결</div>
 </div>
 
 <!-- GM 화면 -->
@@ -396,15 +396,7 @@ input[type=range]{cursor:pointer;}
 
 <div id="toast"></div>
 
-<!-- PeerJS 멀티CDN -->
-<script>
-(function L(cdns,i){
-  if(i>=cdns.length){document.dispatchEvent(new Event('pj-fail'));return;}
-  var s=document.createElement('script');s.src=cdns[i];
-  s.onload=function(){document.dispatchEvent(new Event('pj-ok'));};
-  s.onerror=function(){L(cdns,i+1);};
-  document.head.appendChild(s);
-})(['https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js','https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js','https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js'],0);
+<!-- Cloudflare Workers 시그널링 사용 (PeerJS 불필요) -->
 </script>
 <script>
 const $=id=>document.getElementById(id);
@@ -419,7 +411,18 @@ const ch={
   sfx:{player:null,queue:[],idx:-1,playing:false,loop:true,timer:null}
 };
 let role='',myPeer=null,sessionCode='';
-let gmConns={},plConn=null;
+let plCount=0; // 연결된 PL 수
+// ── Cloudflare Workers WebSocket 시그널링 ──
+const SIG='wss://trpg-worker.wildowlll.workers.dev';
+function mkWS(sid,pid,onMsg,onOpen,onClose){
+  const ws=new WebSocket(SIG+'/ws?session='+encodeURIComponent(sid)+'&peer='+encodeURIComponent(pid));
+  ws.addEventListener('open',onOpen||(()=>{}));
+  ws.addEventListener('message',e=>{try{onMsg(JSON.parse(e.data));}catch(err){}});
+  ws.addEventListener('close',onClose||(()=>{}));
+  ws.addEventListener('error',()=>toast('❌ 시그널링 오류. 새로고침 해주세요.'));
+  return ws;
+}
+function wsSend(ws,msg){if(ws&&ws.readyState===WebSocket.OPEN)try{ws.send(JSON.stringify(msg));}catch(e){}}
 const plP={bgm:null,sfx:null};
 const plSt={bgm:{vid:'',ts:0},sfx:{vid:'',ts:0}};
 
@@ -463,14 +466,14 @@ function makePlayer(wrapperId,vol,onState){
 function showJoin(){$('jbox').classList.add('open');$('jcode').focus();}
 function hideJoin(){$('jbox').classList.remove('open');}
 function goStart(){
-  if(myPeer){myPeer.destroy();myPeer=null;}
+  if(myPeer){try{myPeer.close();}catch(e){}myPeer=null;}
   ['bgm','sfx'].forEach(c=>{
     if(ch[c].timer){clearInterval(ch[c].timer);ch[c].timer=null;}
     ch[c].player=null;ch[c].queue=[];ch[c].idx=-1;ch[c].playing=false;
     if(localAudio[c]){localAudio[c].pause();localAudio[c]=null;}
     if(plLocalAudio[c]){plLocalAudio[c].pause();plLocalAudio[c]=null;}
   });
-  plP.bgm=null;plP.sfx=null;gmConns={};plConn=null;role='';sessionCode='';
+  plP.bgm=null;plP.sfx=null;plCount=0;role='';sessionCode='';
   plAudioUnlocked=false;plLastSync=null;
   const ul=$('pl-unlock');if(ul)ul.style.display='flex';
   ['sg','sp'].forEach(s=>{$(s).style.display='none';});
@@ -479,21 +482,26 @@ function goStart(){
 
 // ── GM ──
 function startGM(){
-  if(typeof Peer==='undefined'){toast('⏳ PeerJS 로딩 중...');return;}
   role='gm';
   $('ss').style.display='none';$('sg').style.display='flex';
   sessionCode=Math.random().toString(36).slice(2,8).toUpperCase();
   $('gm-code').textContent=sessionCode;
 
-  myPeer=new Peer('TRPGW-'+sessionCode,{host:'0.peerjs.com',port:443,path:'/',secure:true,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'}]}});
-  myPeer.on('open',()=>toast('👑 세션 시작! 코드: '+sessionCode));
-  myPeer.on('connection',conn=>{
-    conn.on('open',()=>{
-      gmConns[conn.peer]=conn;updOnline();conn.send(buildSync());toast('🎭 플레이어 입장!');
-      conn.on('close',()=>{delete gmConns[conn.peer];updOnline();toast('🎭 플레이어 퇴장');});
-    });
-  });
-  myPeer.on('error',e=>toast('❌ PeerJS: '+e.type));
+  myPeer=mkWS(sessionCode,'GM',
+    msg=>{
+      if(msg.type==='peer-join'){
+        plCount++;updOnline();
+        setTimeout(()=>wsSend(myPeer,{...buildSync(),to:msg.peerId}),400);
+        toast('🎭 플레이어 입장!');
+      } else if(msg.type==='peer-leave'){
+        plCount=Math.max(0,plCount-1);updOnline();toast('🎭 플레이어 퇴장');
+      } else if(msg.type==='sync-req'){
+        wsSend(myPeer,{...buildSync(),to:msg.from});
+      }
+    },
+    ()=>toast('👑 세션 시작! 코드: '+sessionCode),
+    ()=>{if(role==='gm')toast('⚠️ 연결 끊김 — 새로고침 해주세요');}
+  );
 
   withYT(()=>{
     ch.bgm.player=makePlayer('bgm-yt',70,e=>gmState('bgm',e));
@@ -503,27 +511,7 @@ function startGM(){
   initSc();renderQ('bgm');renderQ('sfx');
 }
 
-function gmState(c,e){
-  const C=ch[c];
-  if(e.data===YT.PlayerState.PLAYING){
-    C.playing=true;$(c+'-pb').textContent='⏸';$(c+'-novid').style.display='none';
-    startTimer(c);gmBroadcast(buildSync());
-  } else if(e.data===YT.PlayerState.PAUSED){
-    C.playing=false;$(c+'-pb').textContent='▶';stopTimer(c);gmBroadcast(buildSync());
-  } else if(e.data===YT.PlayerState.ENDED){
-    stopTimer(c);
-    if(c==='sfx'){
-      const item=C.queue[C.idx];
-      if(item&&item.loop) gmPlayIdx(c,C.idx);          // 트랙 루프
-      else if(C.loop) gmPlayIdx(c,(C.idx+1)%C.queue.length); // 채널 루프 (다음→처음)
-      else gmNext(c);                                    // 루프 없음: 그냥 다음
-    } else {
-      C.loop?gmPlayIdx(c,C.idx):gmNext(c);
-    }
-  }
-}
-
-function updOnline(){$('gm-online').textContent=Object.keys(gmConns).length+'명 연결';}
+function updOnline(){$('gm-online').textContent=plCount+'명 연결';}
 
 // ── 파일 추가 ──
 const MAX_FILE=20*1024*1024; // 20MB
@@ -555,16 +543,16 @@ function sendFileToPL(conn,item,c,idx){
   const fileId=item.id;
 
   // 전송 시작 알림
-  conn.send({type:'file-start',fileId,fileName:item.fileName,fileType:item.fileType,fileSize:total,chunks,ch:c,idx});
+  wsSend(conn,{type:'file-start',fileId,fileName:item.fileName,fileType:item.fileType,fileSize:total,chunks,ch:c,idx});
 
   let i=0;
   function sendNext(){
     if(i>=chunks){
-      conn.send({type:'file-end',fileId,ch:c,idx});
+      wsSend(conn,{type:'file-end',fileId,ch:c,idx});
       return;
     }
     const slice=buf.slice(i*CHUNK,Math.min((i+1)*CHUNK,total));
-    conn.send({type:'file-chunk',fileId,i,data:slice});
+    wsSend(conn,{type:'file-chunk',fileId,i,data:slice});
     i++;
     // 흐름 제어 — 조금씩 쉬어가며 전송
     setTimeout(sendNext,1);
@@ -573,7 +561,8 @@ function sendFileToPL(conn,item,c,idx){
 }
 
 function gmSendFileToAll(item,c,idx){
-  Object.values(gmConns).forEach(conn=>sendFileToPL(conn,item,c,idx));
+  // Workers를 통해 브로드캐스트 (파일은 청크로 분할 전송)
+  sendFileToPL(myPeer,item,c,idx);
 }
 
 // ── 큐 ──
@@ -660,7 +649,7 @@ function gmPlayIdx(c,i){
     if(C.player)C.player.stopVideo&&C.player.stopVideo();
     playLocalAudio(c,item);
     // PL에게 파일 전송 후 재생 신호
-    if(Object.keys(gmConns).length>0){
+    if(plCount>0){
       toast('📤 PL에게 파일 전송 중...');
       gmSendFileToAll(item,c,i);
     }
@@ -766,7 +755,7 @@ function buildSync(){
   };
   return{type:'sync',bgm:snap('bgm'),sfx:snap('sfx'),ts:Date.now()};
 }
-function gmBroadcast(msg){Object.values(gmConns).forEach(c=>{try{c.send(msg);}catch(e){}});}
+function gmBroadcast(msg){wsSend(myPeer,msg);}
 function gmForceSync(){gmBroadcast(buildSync());toast('🔄 동기화 전송');}
 function copyCode(){navigator.clipboard.writeText(sessionCode).then(()=>toast('📋 코드 복사: '+sessionCode));}
 
@@ -801,53 +790,53 @@ function plUnlockAudio(){
 }
 
 function joinPL(){
-  if(typeof Peer==='undefined'){toast('⏳ PeerJS 로딩 중...');return;}
   const code=$('jcode').value.trim().toUpperCase();
   if(!code){toast('세션 코드를 입력하세요');return;}
   role='pl';sessionCode=code;
   $('ss').style.display='none';$('sp').style.display='flex';
   $('pl-code').textContent=code;$('pl-conn').textContent='연결 중...';$('pl-conn').className='conn-b cb-w';
 
-  myPeer=new Peer('TRPGW-PL-'+Math.random().toString(36).slice(2,8).toUpperCase(),{host:'0.peerjs.com',port:443,path:'/',secure:true,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'}]}});
-  myPeer.on('open',()=>{
-    plConn=myPeer.connect('TRPGW-'+code,{reliable:true});
-    plConn.on('open',()=>{$('pl-conn').textContent='연결됨';$('pl-conn').className='conn-b cb-ok';toast('✅ GM과 연결됨!');});
-    plConn.on('data',d=>plHandle(d));
-    plConn.on('close',()=>{$('pl-conn').textContent='연결 끊김';$('pl-conn').className='conn-b cb-e';toast('⚠️ 연결 끊어짐');});
-  });
-  myPeer.on('error',e=>{
-    if(e.type==='peer-unavailable'){$('pl-conn').textContent='세션 없음';$('pl-conn').className='conn-b cb-e';toast('❌ 세션을 찾을 수 없어요');}
-    else toast('❌ '+e.type);
-  });
+  const plId='PL-'+Math.random().toString(36).slice(2,8).toUpperCase();
+  myPeer=mkWS(code,plId,
+    msg=>{
+      if(msg.type==='sync'){plHandle(msg);}
+      else if(msg.type==='file-start') plFileStart(msg);
+      else if(msg.type==='file-chunk') plFileChunk(msg);
+      else if(msg.type==='file-end')   plFileEnd(msg);
+      else if(msg.type==='peer-join'&&msg.peerId==='GM'){
+        // GM이 나중에 들어온 경우 sync 요청
+        wsSend(myPeer,{type:'sync-req',to:'GM'});
+      }
+    },
+    ()=>{
+      $('pl-conn').textContent='연결됨';$('pl-conn').className='conn-b cb-ok';
+      toast('✅ 세션 연결됨!');
+      // 입장 후 GM에게 sync 요청
+      setTimeout(()=>wsSend(myPeer,{type:'sync-req',to:'GM'}),500);
+    },
+    ()=>{$('pl-conn').textContent='연결 끊김';$('pl-conn').className='conn-b cb-e';toast('⚠️ 연결 끊어짐');}
+  );
 
   withYT(()=>{
     plP.bgm=makePlayer('pl-bgm-yt',70,e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-bgm-novid').style.display='none';});
     plP.sfx=makePlayer('pl-sfx-yt',80,e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-sfx-novid').style.display='none';});
   });
 
-  // ── 탭 가시성 API — 탭 복귀 시 강제 재동기화 ──
+  // 탭 복귀 시 강제 재동기화
   document.addEventListener('visibilitychange',()=>{
     if(role!=='pl')return;
-    if(document.visibilityState==='visible'&&plLastSync){
-      // 탭으로 돌아왔을 때 최신 sync 상태로 강제 맞추기
-      setTimeout(()=>{
-        plApply('bgm',plLastSync.bgm);
-        plApply('sfx',plLastSync.sfx);
-      },300);
+    if(document.visibilityState==='visible'){
+      wsSend(myPeer,{type:'sync-req',to:'GM'});
+      setTimeout(()=>{if(plLastSync){plApply('bgm',plLastSync.bgm);plApply('sfx',plLastSync.sfx);}},300);
     }
   });
 }
 
 function plHandle(d){
-  if(!d)return;
-  if(d.type==='sync'){
-    plLastSync=d; // 탭 복귀 시 재동기화용으로 저장
-    if(!plAudioUnlocked)return; // 언락 전이면 저장만 하고 재생 안 함
-    plApply('bgm',d.bgm);plApply('sfx',d.sfx);
-  }
-  else if(d.type==='file-start') plFileStart(d);
-  else if(d.type==='file-chunk') plFileChunk(d);
-  else if(d.type==='file-end')   plFileEnd(d);
+  if(!d||d.type!=='sync')return;
+  plLastSync=d;
+  if(!plAudioUnlocked)return;
+  plApply('bgm',d.bgm);plApply('sfx',d.sfx);
 }
 
 // ── PL 파일 수신 ──
@@ -1080,7 +1069,7 @@ function renderThemeDrop(el){
 // ── 초기화 ──
 applyTheme(curTheme);
 $('jcode').addEventListener('keydown',e=>{if(e.key==='Enter')joinPL();});
-document.addEventListener('pj-fail',()=>toast('❌ PeerJS 로드 실패',4000));
+// Cloudflare Workers 시그널링 사용 중
 </script>
 </body>
 </html>
