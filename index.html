@@ -227,7 +227,7 @@ input[type=range]{cursor:pointer;}
       <button class="btn btn-g" onclick="hideJoin()">취소</button>
     </div>
   </div>
-  <div class="notice">📡 Cloudflare Workers 시그널링 — 안정적인 실시간 연결</div>
+
 </div>
 
 <!-- GM 화면 -->
@@ -826,7 +826,6 @@ function joinPL(){
   const plId='PL-'+Math.random().toString(36).slice(2,8).toUpperCase();
   myPeer=mkWS(code,plId,
     msg=>{
-      console.log('[PL] WS msg:', msg?.type, JSON.stringify(msg).slice(0,120));
       if(msg.type==='sync'){plHandle(msg);}
       else if(msg.type==='file-start') plFileStart(msg);
       else if(msg.type==='file-chunk') plFileChunk(msg);
@@ -848,7 +847,6 @@ function joinPL(){
     plP.bgm=makePlayer('pl-bgm-yt',70,
       e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-bgm-novid').style.display='none';},
       ()=>{
-        console.log('[PL] BGM player ready, unlocked:', plAudioUnlocked, 'lastSync:', !!plLastSync);
         // 플레이어 준비 완료 — 언락됐으면 바로 적용
         if(plLastSync&&plAudioUnlocked) plApply('bgm',plLastSync.bgm);
         // 언락 안 됐어도 cue는 해둬서 화면에 미리 보여주기
@@ -862,7 +860,6 @@ function joinPL(){
     plP.sfx=makePlayer('pl-sfx-yt',80,
       e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-sfx-novid').style.display='none';},
       ()=>{
-        console.log('[PL] SFX player ready, unlocked:', plAudioUnlocked, 'lastSync:', !!plLastSync);
         if(plLastSync&&plAudioUnlocked) plApply('sfx',plLastSync.sfx);
         else if(plLastSync?.sfx?.videoId){
           plP.sfx.cueVideoById({videoId:plLastSync.sfx.videoId,startSeconds:plLastSync.sfx.time||0});
@@ -910,7 +907,6 @@ function plUnlockAudio(){
 }
 
 function plHandle(d){
-  console.log('[PL] plHandle called, type:', d?.type, 'unlocked:', plAudioUnlocked, 'player ready:', !!plP.bgm?.loadVideoById);
   if(!d||d.type!=='sync')return;
   plLastSync=d;
   // 언락됐으면 적용 시도, 플레이어 미준비면 onReady에서 처리
@@ -976,7 +972,6 @@ function hideXferBar(c){
 }
 
 function plApply(c,s){
-  console.log('[plApply]', c, 'videoId:', s?.videoId, 'playing:', s?.playing, 'player:', !!plP[c]?.loadVideoById);
   if(!s)return;
   if(s.title)$('pl-'+c+'-ttl').textContent=s.title;
 
@@ -1005,7 +1000,6 @@ function plApply(c,s){
   const st=plSt[c];
   if(s.videoId&&s.videoId!==st.vid){
     st.vid=s.videoId;
-    console.log('[plApply] loading video:', s.videoId, 'playing:', s.playing);
     if(s.playing){p.loadVideoById({videoId:s.videoId,startSeconds:s.time||0});}
     else{p.cueVideoById({videoId:s.videoId,startSeconds:s.time||0});}
     $('pl-'+c+'-novid').style.display='none';
