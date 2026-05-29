@@ -803,12 +803,12 @@ function joinPL(){
   const plId='PL-'+Math.random().toString(36).slice(2,8).toUpperCase();
   myPeer=mkWS(code,plId,
     msg=>{
+      console.log('[PL] WS msg:', msg?.type, JSON.stringify(msg).slice(0,120));
       if(msg.type==='sync'){plHandle(msg);}
       else if(msg.type==='file-start') plFileStart(msg);
       else if(msg.type==='file-chunk') plFileChunk(msg);
       else if(msg.type==='file-end')   plFileEnd(msg);
       else if(msg.type==='peer-join'&&msg.peerId==='GM'){
-        // GM이 나중에 들어온 경우 sync 요청
         wsSend(myPeer,{type:'sync-req',to:'GM'});
       }
     },
@@ -870,9 +870,9 @@ function plUnlockAudio(){
 }
 
 function plHandle(d){
+  console.log('[PL] plHandle called, type:', d?.type, 'unlocked:', plAudioUnlocked, 'player ready:', !!plP.bgm?.loadVideoById);
   if(!d||d.type!=='sync')return;
   plLastSync=d;
-  // 언락됐고 플레이어 준비됐으면 바로 적용
   if(plAudioUnlocked&&plP.bgm?.loadVideoById){
     plApply('bgm',d.bgm);
     plApply('sfx',d.sfx);
@@ -935,7 +935,6 @@ function hideXferBar(c){
 }
 
 function plApply(c,s){
-  console.log('plApply', c, s?.videoId, 'player:', !!plP[c]?.loadVideoById, 'unlocked:', plAudioUnlocked);  // ← 이 줄 추가
   if(!s)return;
   if(s.title)$('pl-'+c+'-ttl').textContent=s.title;
 
