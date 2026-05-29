@@ -448,13 +448,15 @@ function withYT(f){ytReady?f():ytQ.push(f);}
 
 function makePlayer(wrapperId,vol,onState){
   const wrap=$(wrapperId);
-  // inner div 생성
   const inner=document.createElement('div');
   inner.style.cssText='width:100%;height:100%;';
   wrap.appendChild(inner);
   return new YT.Player(inner,{
     width:'100%',height:'100%',
-    playerVars:{controls:0,rel:0,modestbranding:1,playsinline:1,enablejsapi:1},
+    playerVars:{
+      controls:0,rel:0,modestbranding:1,playsinline:1,enablejsapi:1,
+      origin:location.origin  // ← postMessage 오류 수정
+    },
     events:{
       onReady:e=>e.target.setVolume(vol),
       onStateChange:onState
