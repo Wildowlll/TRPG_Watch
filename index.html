@@ -448,10 +448,15 @@ function withYT(f){ytReady?f():ytQ.push(f);}
 
 function makePlayer(wrapperId,vol,onState,onReady){
   const wrap=$(wrapperId);
+  // 기존 inner 있으면 제거 (중복 방지)
+  const existing=document.getElementById(wrapperId+'-player');
+  if(existing) existing.remove();
   const innerId=wrapperId+'-player';
   const inner=document.createElement('div');
   inner.id=innerId;
-  inner.style.cssText='width:100%;height:100%;';
+  // position:absolute로 부모를 꽉 채우기
+  inner.style.cssText='position:absolute;inset:0;width:100%;height:100%;';
+  wrap.style.position='relative';
   wrap.appendChild(inner);
   return new YT.Player(innerId,{
     width:'100%',height:'100%',
