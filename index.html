@@ -413,7 +413,7 @@ const ch={
 let role='',myPeer=null,sessionCode='';
 let plCount=0; // 연결된 PL 수
 // ── Cloudflare Workers WebSocket 시그널링 ──
-const SIG='wss://trpg-worker.wildowlll.workers.dev';
+const SIG='wss://trpg-signal-production.up.railway.app';
 function mkWS(sid,pid,onMsg,onOpen,onClose){
   const ws=new WebSocket(SIG+'/ws?session='+encodeURIComponent(sid)+'&peer='+encodeURIComponent(pid));
   ws.addEventListener('open',onOpen||(()=>{}));
