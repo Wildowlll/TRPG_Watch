@@ -405,12 +405,33 @@ let role='',myPeer=null,sessionCode='';
 let plCount=0; // 연결된 PL 수
 // ── Cloudflare Workers WebSocket 시그널링 ──
 const SIG='wss://trpg-signal-production.up.railway.app';
-function mkWS(sid,pid,onMsg,onOpen,onClose){
+function mkWS(sid,pid,onMsg,onOpen,onClose,_retry=0){
   const ws=new WebSocket(SIG+'/ws?session='+encodeURIComponent(sid)+'&peer='+encodeURIComponent(pid));
-  ws.addEventListener('open',onOpen||(()=>{}));
+  let opened=false;
+  ws.addEventListener('open',e=>{
+    opened=true;
+    _retry=0;
+    (onOpen||(()=>{}))(e);
+  });
   ws.addEventListener('message',e=>{try{onMsg(JSON.parse(e.data));}catch(err){}});
-  ws.addEventListener('close',onClose||(()=>{}));
-  ws.addEventListener('error',()=>toast('❌ 시그널링 오류. 새로고침 해주세요.'));
+  ws.addEventListener('close',e=>{
+    (onClose||(()=>{}))(e);
+    // 정상 종료(1000)가 아니면 자동 재연결
+    if(!opened||e.code!==1000){
+      if(_retry<5){
+        const delay=Math.min(1000*Math.pow(2,_retry),16000); // 1s,2s,4s,8s,16s
+        toast(`🔄 연결 재시도 중... (${_retry+1}/5)`);
+        setTimeout(()=>{
+          if(role==='gm'||role==='pl'){
+            myPeer=mkWS(sid,pid,onMsg,onOpen,onClose,_retry+1);
+          }
+        },delay);
+      } else {
+        toast('❌ 연결 실패. 새로고침 해주세요.');
+      }
+    }
+  });
+  ws.addEventListener('error',()=>{});
   return ws;
 }
 function wsSend(ws,msg){if(ws&&ws.readyState===WebSocket.OPEN)try{ws.send(JSON.stringify(msg));}catch(e){}}
