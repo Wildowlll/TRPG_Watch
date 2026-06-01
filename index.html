@@ -107,7 +107,17 @@ input[type=range]{cursor:pointer;}
 .vol-a{accent-color:var(--a);width:66px;}.vol-b{accent-color:var(--b);width:66px;}
 
 /* 큐 */
-.qrow{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--ba);height:205px;flex-shrink:0;overflow:hidden;}
+.qrow{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--ba);height:205px;flex-shrink:0;overflow:hidden;position:relative;}
+.qrow-handle{
+  position:absolute;top:-4px;left:0;right:0;height:8px;
+  cursor:ns-resize;z-index:10;
+  display:flex;align-items:center;justify-content:center;
+}
+.qrow-handle::after{
+  content:'';width:40px;height:3px;border-radius:2px;
+  background:var(--border-gold,var(--ba));opacity:0.5;transition:opacity 0.15s;
+}
+.qrow-handle:hover::after{opacity:1;background:var(--a);}
 .qpanel{display:flex;flex-direction:column;overflow:hidden;}
 .qpanel-b{border-left:1px solid var(--bb);}
 .qh{display:flex;align-items:center;gap:6px;padding:5px 11px;border-bottom:1px solid;flex-shrink:0;}
@@ -288,7 +298,8 @@ input[type=range]{cursor:pointer;}
       </div>
     </div>
 
-    <div class="qrow" style="grid-column:1/-1;grid-row:4;">
+    <div class="qrow" style="grid-column:1/-1;grid-row:4;" id="qrow">
+      <div class="qrow-handle" id="qrow-handle"></div>
       <div class="qpanel">
         <div class="qh qh-a"><span style="color:var(--a)">BGM 목록</span><span class="qcnt" id="bgm-qcnt">0개</span></div>
         <div class="addrow addrow-a">
@@ -958,7 +969,38 @@ function stopKeepAlive(){
   if(keepAliveTimer){clearInterval(keepAliveTimer);keepAliveTimer=null;}
 }
 
-// ── 초기화 ──
+// ── 재생목록 높이 드래그 조절 ──
+(function(){
+  const handle=$('qrow-handle');
+  const qrow=$('qrow');
+  if(!handle||!qrow)return;
+  let dragging=false,startY=0,startH=0;
+  const MIN_H=120,MAX_H=600;
+
+  handle.addEventListener('mousedown',e=>{
+    dragging=true;startY=e.clientY;startH=qrow.offsetHeight;
+    document.body.style.cursor='ns-resize';
+    document.body.style.userSelect='none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const diff=startY-e.clientY; // 위로 드래그 = 높아짐
+    const newH=Math.min(MAX_H,Math.max(MIN_H,startH+diff));
+    qrow.style.height=newH+'px';
+  });
+  document.addEventListener('mouseup',()=>{
+    if(!dragging)return;
+    dragging=false;
+    document.body.style.cursor='';
+    document.body.style.userSelect='';
+    // 높이 저장
+    localStorage.setItem('trpg-qrow-h',qrow.style.height);
+  });
+  // 저장된 높이 복원
+  const saved=localStorage.getItem('trpg-qrow-h');
+  if(saved)qrow.style.height=saved;
+})();
 applyTheme(curTheme);
 $('jcode').addEventListener('keydown',e=>{if(e.key==='Enter')joinPL();});
 </script>
