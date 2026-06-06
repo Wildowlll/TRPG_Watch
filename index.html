@@ -152,6 +152,16 @@ input[type=range]{cursor:pointer;}
 .qi-loop.on{border-color:var(--b);color:var(--b);}
 .qi-del{background:none;border:none;color:var(--red);cursor:pointer;font-size:11px;opacity:0;padding:1px 3px;flex-shrink:0;}
 .qi:hover .qi-del{opacity:1;}
+.qi-memo{
+  font-size:10px;padding:2px 6px;background:transparent;
+  border:none;border-bottom:1px solid transparent;
+  color:var(--muted);font-family:inherit;outline:none;
+  width:200px;flex-shrink:0;transition:all 0.12s;
+  cursor:text;
+}
+.qi-memo:hover{border-bottom-color:var(--ba);}
+.qi-memo:focus{border-bottom-color:var(--a);color:var(--text);background:var(--bg2);border-radius:3px 3px 0 0;}
+.qi-memo::placeholder{color:var(--muted);opacity:0.5;}
 .empty-q{text-align:center;padding:14px 10px;font-size:11px;color:var(--muted);}
 
 /* PL 화면 */
@@ -577,7 +587,7 @@ async function addTrack(c){
   const inp=$(c+'-inp'),url=inp.value.trim();
   if(!url){toast('URL을 입력하세요');return;}
   const id=ytId(url);if(!id){toast('❌ 유효한 YouTube URL 아님');return;}
-  const item={id,title:'로딩 중...',loop:false};
+  const item={id,title:'로딩 중...',loop:false,memo:''};
   ch[c].queue.push(item);inp.value='';
   renderQ(c);toast('✅ 추가됨');
   try{
@@ -599,6 +609,10 @@ function renderQ(c){
       <div class="qi-info"><div class="qi-ttl">${item.title}</div>
       <div class="qi-id">${item.id}</div></div>
       <button class="qi-loop ${item.loop?'on':''}" onclick="event.stopPropagation();toggleTL('${c}',${i})">${item.loop?'🔁':'↩'}</button>
+      <input class="qi-memo" maxlength="35" placeholder="메모..." value="${item.memo||''}"
+        onclick="event.stopPropagation()"
+        oninput="event.stopPropagation();updateMemo('${c}',${i},this.value)"
+        title="최대 30자">
       <button class="qi-del" onclick="event.stopPropagation();delTrack('${c}',${i})">✕</button>
     </div>`).join('');
 
@@ -630,6 +644,11 @@ function renderQ(c){
 }
 
 function toggleTL(c,i){const item=ch[c].queue[i];if(!item)return;item.loop=!item.loop;renderQ(c);saveSc();}
+function updateMemo(c,i,val){
+  const item=ch[c].queue[i];if(!item)return;
+  item.memo=val.slice(0,35);
+  saveSc();
+}
 function delTrack(c,i){
   ch[c].queue.splice(i,1);
   if(ch[c].idx===i)ch[c].idx=-1;else if(ch[c].idx>i)ch[c].idx--;
