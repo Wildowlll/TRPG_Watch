@@ -599,10 +599,6 @@ async function addTrack(c){
 
 function renderQ(c){
   const C=ch[c],el=$(c+'-ql');
-  // 현재 메모 input 값들 저장 (재렌더링 시 유지)
-  el.querySelectorAll('.qi-memo').forEach((inp,i)=>{
-    if(C.queue[i]) C.queue[i].memo=inp.value;
-  });
   $(c+'-qcnt').textContent=C.queue.length+'개';
   if(!C.queue.length){el.innerHTML='<div class="empty-q">YouTube URL을 추가해보세요</div>';return;}
   el.innerHTML=C.queue.map((item,i)=>`
@@ -638,6 +634,10 @@ function renderQ(c){
       if(e.dataTransfer.getData('c')!==c)return;
       const from=+e.dataTransfer.getData('i'),to=+qi.dataset.i;
       if(from===to)return;
+      // 드래그 전에 현재 메모 input값 수집
+      el.querySelectorAll('.qi-memo').forEach((inp,idx)=>{
+        if(ch[c].queue[idx])ch[c].queue[idx].memo=inp.value;
+      });
       const[m]=ch[c].queue.splice(from,1);ch[c].queue.splice(to,0,m);
       if(ch[c].idx===from)ch[c].idx=to;
       else if(ch[c].idx>from&&ch[c].idx<=to)ch[c].idx--;
