@@ -260,6 +260,9 @@ input[type=range]{cursor:pointer;}
       </div>
       <button class="btn btn-g" style="font-size:11px;" onclick="copyCode()">🔗 복사</button>
       <button class="btn btn-g" style="font-size:11px;" onclick="gmForceSync()">🔄 동기화</button>
+      <button class="btn btn-g" style="font-size:11px;" onclick="exportScenarios()" title="시나리오 전체 저장">💾 저장</button>
+      <button class="btn btn-g" style="font-size:11px;" onclick="$('import-file').click()" title="시나리오 불러오기">📂 불러오기</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importScenarios(this)">
       <button class="btn btn-g" style="font-size:11px;" onclick="openSK()">⌨️</button>
       <button class="btn btn-g" style="font-size:11px;" onclick="goStart()">나가기</button>
     </div>
@@ -959,7 +962,55 @@ function renderThemeDrop(el){
     </div>`).join('');
 }
 
-// ── 서버 슬립 방지 (Railway 무료 플랜) ──
+// ── 시나리오 저장/불러오기 ──
+function exportScenarios(){
+  saveSc(); // 현재 시나리오 먼저 저장
+  const data={
+    version:1,
+    exportedAt:new Date().toISOString(),
+    scenarios:scenarios
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='trpg-watch-scenarios-'+new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'')+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('💾 저장됐어요!');
+}
+
+function importScenarios(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.scenarios||!Array.isArray(data.scenarios)){
+        toast('❌ 올바른 파일이 아니에요');return;
+      }
+      if(!confirm(`시나리오 ${data.scenarios.length}개를 불러올까요?\n현재 시나리오 목록에 추가됩니다.`)){return;}
+      // 기존 시나리오에 추가 (id 중복 방지)
+      const existingIds=new Set(scenarios.map(s=>s.id));
+      let added=0;
+      data.scenarios.forEach(sc=>{
+        if(existingIds.has(sc.id)){
+          sc.id='sc'+Date.now()+Math.random().toString(36).slice(2,6);
+        }
+        scenarios.push(sc);
+        added++;
+      });
+      persist();
+      renderScDrop();
+      toast(`✅ 시나리오 ${added}개 불러왔어요!`);
+    }catch(err){
+      toast('❌ 파일을 읽을 수 없어요');
+    }
+    input.value='';
+  };
+  reader.readAsText(file);
+}
 let keepAliveTimer=null;
 function startKeepAlive(){
   if(keepAliveTimer)return;
