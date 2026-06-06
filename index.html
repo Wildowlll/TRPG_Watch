@@ -599,6 +599,10 @@ async function addTrack(c){
 
 function renderQ(c){
   const C=ch[c],el=$(c+'-ql');
+  // 현재 메모 input 값들 저장 (재렌더링 시 유지)
+  el.querySelectorAll('.qi-memo').forEach((inp,i)=>{
+    if(C.queue[i]) C.queue[i].memo=inp.value;
+  });
   $(c+'-qcnt').textContent=C.queue.length+'개';
   if(!C.queue.length){el.innerHTML='<div class="empty-q">YouTube URL을 추가해보세요</div>';return;}
   el.innerHTML=C.queue.map((item,i)=>`
@@ -866,8 +870,8 @@ function initSc(){
 function persist(){localStorage.setItem(SC_KEY,JSON.stringify(scenarios));}
 function saveSc(){
   const sc=scenarios.find(s=>s.id===curSc);if(!sc)return;
-  sc.bgm=ch.bgm.queue.map(q=>({id:q.id,title:q.title,loop:q.loop}));
-  sc.sfx=ch.sfx.queue.map(q=>({id:q.id,title:q.title,loop:q.loop}));
+  sc.bgm=ch.bgm.queue.map(q=>({id:q.id,title:q.title,loop:q.loop,memo:q.memo||''}));
+  sc.sfx=ch.sfx.queue.map(q=>({id:q.id,title:q.title,loop:q.loop,memo:q.memo||''}));
   persist();
 }
 function loadSc(id){
@@ -925,7 +929,11 @@ function fadeCh(c,dur=3){
   const start=C.player.getVolume?.()??70,step=start/(dur*20);
   const t=setInterval(()=>{
     const v=C.player.getVolume?.()??0;
-    if(v-step<=0){C.player.setVolume(0);C.player.pauseVideo();clearInterval(t);}
+    if(v-step<=0){
+      C.player.setVolume(0);C.player.pauseVideo();clearInterval(t);
+      // 볼륨 슬라이더 UI도 0으로
+      $(c+'-vol').value=0;$(c+'-vv').textContent=0;
+    }
     else C.player.setVolume(v-step);
   },50);
 }
