@@ -572,8 +572,8 @@ function fadeIn(c,dur=3){
   const C=ch[c];if(!C.player)return;
   const target=70; // 항상 70으로 페이드인
   if(fadeInTimers[c]){clearInterval(fadeInTimers[c]);fadeInTimers[c]=null;}
-  C.player.setVolume(0);
-  const step=target/(dur*20);
+  C.player.setVolume(1); // 0이면 재생 차단될 수 있어서 1로 시작
+  const step=(target-1)/(dur*20);
   fadeInTimers[c]=setInterval(()=>{
     const v=C.player.getVolume?.()??0;
     if(v+step>=target){
@@ -942,12 +942,12 @@ const plFadeTimers={bgm:null,sfx:null};
 
 function plFadeIn(c,dur=3){
   const p=plP[c];if(!p)return;
-  const target=70; // 항상 70으로 페이드인
+  const target=70;
   if(plFadeTimers[c]){clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;}
-  p.setVolume(30);
-  const step=(target-30)/(dur*20);
+  p.setVolume(1); // 0이면 autoplay 차단될 수 있어서 1로 시작
+  const step=(target-1)/(dur*20);
   plFadeTimers[c]=setInterval(()=>{
-    const v=p.getVolume?.()??30;
+    const v=p.getVolume?.()??1;
     if(v+step>=target){
       p.setVolume(target);
       $('pl-'+c+'-vol').value=target;$('pl-'+c+'-vv').textContent=target;
