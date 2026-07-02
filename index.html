@@ -865,7 +865,13 @@ function joinPL(){
 
   withYT(()=>{
     plP.bgm=makePlayer('pl-bgm-yt',70,
-      e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-bgm-novid').style.display='none';},
+      e=>{
+        if(e.data===YT.PlayerState.PLAYING)$('pl-bgm-novid').style.display='none';
+        // CUED(5) 상태에서 재생 의도 있으면 playVideo
+        if(e.data===5&&plSt.bgm.shouldPlay){
+          e.target.playVideo();plFadeIn('bgm');
+        }
+      },
       ()=>{
         // 플레이어 준비 완료 — 언락됐으면 바로 적용
         if(plLastSync&&plAudioUnlocked) plApply('bgm',plLastSync.bgm);
@@ -976,17 +982,34 @@ function plApply(c,s){
   const st=plSt[c];
   if(s.videoId&&s.videoId!==st.vid){
     st.vid=s.videoId;
-    if(s.playing){
-      p.loadVideoById({videoId:s.videoId,startSeconds:s.time||0});
-      plFadeIn(c);
-    } else {
-      p.cueVideoById({videoId:s.videoId,startSeconds:s.time||0});
-    }
+    st.shouldPlay=s.playing; // 재생 의도 저장
+    // cueVideoById로 로드만 하고 CUED 상태에서 명시적으로 play
+    p.cueVideoById({videoId:s.videoId,startSeconds:s.time||0});
     $('pl-'+c+'-novid').style.display='none';
+    if(s.playing){
+      // 로드 완료 후 재생 — 여러 번 시도
+      let attempts=0;
+      const tryPlay=()=>{
+        attempts++;
+        const state=p.getPlayerState?.();
+        // CUED(5) 또는 PAUSED(2) 상태면 재생
+        if(state===5||state===2||state===1){
+          p.playVideo?.();
+          plFadeIn(c);
+        } else if(attempts<10){
+          setTimeout(tryPlay,300);
+        }
+      };
+      setTimeout(tryPlay,300);
+    }
   } else if(s.videoId&&s.ts!==st.ts){
     const local=p.getCurrentTime?.()??0;
     if(Math.abs((s.time||0)-local)>2)p.seekTo(s.time||0,true);
-    setTimeout(()=>{s.playing?p.playVideo?.():p.pauseVideo?.();},300);
+    if(s.playing){
+      p.playVideo?.();
+    } else {
+      p.pauseVideo?.();
+    }
   }
   st.ts=s.ts;
 }
