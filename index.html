@@ -867,25 +867,27 @@ function joinPL(){
     plP.bgm=makePlayer('pl-bgm-yt',70,
       e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-bgm-novid').style.display='none';},
       ()=>{
-        // 플레이어 준비 완료 — 언락됐으면 바로 적용
-        if(plLastSync&&plAudioUnlocked) plApply('bgm',plLastSync.bgm);
-        // 언락 안 됐어도 cue는 해둬서 화면에 미리 보여주기
-        else if(plLastSync?.bgm?.videoId){
-          plP.bgm.cueVideoById({videoId:plLastSync.bgm.videoId,startSeconds:plLastSync.bgm.time||0});
-          $('pl-bgm-novid').style.display='none';
-          if(plLastSync.bgm.title) $('pl-bgm-ttl').textContent=plLastSync.bgm.title;
-        }
+        setTimeout(()=>{
+          if(plLastSync&&plAudioUnlocked) plApply('bgm',plLastSync.bgm);
+          else if(plLastSync?.bgm?.videoId){
+            plP.bgm.cueVideoById({videoId:plLastSync.bgm.videoId,startSeconds:plLastSync.bgm.time||0});
+            $('pl-bgm-novid').style.display='none';
+            if(plLastSync.bgm.title) $('pl-bgm-ttl').textContent=plLastSync.bgm.title;
+          }
+        },800);
       }
     );
     plP.sfx=makePlayer('pl-sfx-yt',80,
       e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-sfx-novid').style.display='none';},
       ()=>{
-        if(plLastSync&&plAudioUnlocked) plApply('sfx',plLastSync.sfx);
-        else if(plLastSync?.sfx?.videoId){
-          plP.sfx.cueVideoById({videoId:plLastSync.sfx.videoId,startSeconds:plLastSync.sfx.time||0});
-          $('pl-sfx-novid').style.display='none';
-          if(plLastSync.sfx.title) $('pl-sfx-ttl').textContent=plLastSync.sfx.title;
-        }
+        setTimeout(()=>{
+          if(plLastSync&&plAudioUnlocked) plApply('sfx',plLastSync.sfx);
+          else if(plLastSync?.sfx?.videoId){
+            plP.sfx.cueVideoById({videoId:plLastSync.sfx.videoId,startSeconds:plLastSync.sfx.time||0});
+            $('pl-sfx-novid').style.display='none';
+            if(plLastSync.sfx.title) $('pl-sfx-ttl').textContent=plLastSync.sfx.title;
+          }
+        },800);
       }
     );
   });
@@ -910,11 +912,12 @@ function plUnlockAudio(){
       plAudioUnlocked=true;
       $('pl-unlock').style.display='none';
       toast('✅ 오디오 활성화됨! 탭 전환해도 재생됩니다.');
-      // 언락 후 대기 중 sync 즉시 적용 (플레이어 준비 여부 무관하게 저장, onReady에서 처리)
-      if(plLastSync){
-        if(plP.bgm?.loadVideoById) plApply('bgm',plLastSync.bgm);
-        if(plP.sfx?.loadVideoById) plApply('sfx',plLastSync.sfx);
-      }
+      setTimeout(()=>{
+        if(plLastSync){
+          if(plP.bgm?.loadVideoById) plApply('bgm',plLastSync.bgm);
+          if(plP.sfx?.loadVideoById) plApply('sfx',plLastSync.sfx);
+        }
+      },500);
     });
   }catch(e){
     plAudioUnlocked=true;
