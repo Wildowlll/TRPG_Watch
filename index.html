@@ -546,7 +546,7 @@ function startGM(){
       } else if(msg.type==='peer-leave'){
         plCount=Math.max(0,plCount-1);updOnline();toast('🎭 플레이어 퇴장');
       } else if(msg.type==='sync-req'){
-        wsSend(myPeer,{...buildSync(),to:msg.from});
+        wsSend(myPeer,{...buildSync(),to:msg.from,forceReload:true});
       }
     },
     ()=>{toast('👑 세션 시작! 코드: '+sessionCode);startKeepAlive();},
@@ -912,12 +912,10 @@ function plUnlockAudio(){
       plAudioUnlocked=true;
       $('pl-unlock').style.display='none';
       toast('✅ 오디오 활성화됨! 탭 전환해도 재생됩니다.');
+      // 언락 후 GM에게 최신 sync 재요청
       setTimeout(()=>{
-        if(plLastSync){
-          if(plP.bgm?.loadVideoById) plApply('bgm',plLastSync.bgm);
-          if(plP.sfx?.loadVideoById) plApply('sfx',plLastSync.sfx);
-        }
-      },500);
+        wsSend(myPeer,{type:'sync-req',to:'GM'});
+      },300);
     });
   }catch(e){
     plAudioUnlocked=true;
@@ -931,8 +929,12 @@ function plUnlockAudio(){
 
 function plHandle(d){
   if(!d||d.type!=='sync')return;
+  // sync-req 응답으로 온 새 sync면 vid 리셋해서 강제 재로드
+  if(d.forceReload){
+    plSt.bgm.vid='';
+    plSt.sfx.vid='';
+  }
   plLastSync=d;
-  // 언락됐으면 적용 시도, 플레이어 미준비면 onReady에서 처리
   if(plAudioUnlocked){
     if(plP.bgm?.loadVideoById) plApply('bgm',d.bgm);
     if(plP.sfx?.loadVideoById) plApply('sfx',d.sfx);
