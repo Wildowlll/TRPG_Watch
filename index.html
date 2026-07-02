@@ -328,8 +328,6 @@ input[type=range]{cursor:pointer;}
         <div class="addrow addrow-b">
           <input class="urlinp urlinp-b" id="sfx-inp" placeholder="YouTube URL 붙여넣기" onkeydown="if(event.key==='Enter')addTrack('sfx')">
           <button class="addbtn addbtn-b" onclick="addTrack('sfx')">+ URL</button>
-          <button class="addbtn addbtn-b" onclick="$('sfx-file-inp').click()" title="로컬 파일 (5MB 이하, 최대 20개)">📂</button>
-          <input type="file" id="sfx-file-inp" accept="audio/*" multiple style="display:none" onchange="addSFXFiles(this)">
         </div>
         <div class="qlist" id="sfx-ql"></div>
       </div>
@@ -384,7 +382,7 @@ input[type=range]{cursor:pointer;}
       </div>
     </div>
     <div class="pl-ch pl-ch-b">
-      <div class="ch-hdr ch-hdr-b" style="border-bottom:1px solid var(--bb);"><span class="ch-lbl ch-lbl-b">⚡ SFX</span><span id="pl-sfx-dl" style="font-size:10px;color:var(--b);margin-left:6px;"></span></div>
+      <div class="ch-hdr ch-hdr-b" style="border-bottom:1px solid var(--bb);"><span class="ch-lbl ch-lbl-b">⚡ SFX</span></div>
       <div class="pl-player">
         <div class="novid" id="pl-sfx-novid"><div class="novid-ico">⚡</div><div class="novid-txt">대기 중</div></div>
         <div class="yt-inner" id="pl-sfx-yt"></div>
@@ -537,11 +535,7 @@ function startGM(){
     msg=>{
       if(msg.type==='peer-join'){
         plCount++;updOnline();
-        setTimeout(()=>{
-          wsSend(myPeer,{...buildSync(),to:msg.peerId});
-          // 로컬 SFX 파일 전송
-          gmSendAllSFXFiles(msg.peerId);
-        },400);
+        setTimeout(()=>wsSend(myPeer,{...buildSync(),to:msg.peerId}),400);
         toast('🎭 플레이어 입장!');
       } else if(msg.type==='peer-leave'){
         plCount=Math.max(0,plCount-1);updOnline();toast('🎭 플레이어 퇴장');
@@ -559,38 +553,14 @@ function startGM(){
   });
 
   initSc();renderQ('bgm');renderQ('sfx');
-  // IndexedDB에서 SFX 파일 복원
-  restoreSFXFiles();
 }
 
 function updOnline(){$('gm-online').textContent=plCount+'명 연결';}
-
-// 페이드 전 원본 볼륨 기억
-const fadeTargetVol={bgm:70,sfx:70};
-
-function fadeIn(c,dur=3){
-  const C=ch[c];if(!C.player)return;
-  const target=70; // 항상 70으로 페이드인
-  if(fadeInTimers[c]){clearInterval(fadeInTimers[c]);fadeInTimers[c]=null;}
-  C.player.setVolume(0);
-  const step=target/(dur*20);
-  fadeInTimers[c]=setInterval(()=>{
-    const v=C.player.getVolume?.()??0;
-    if(v+step>=target){
-      C.player.setVolume(target);
-      $(c+'-vol').value=target;$(c+'-vv').textContent=target;
-      clearInterval(fadeInTimers[c]);fadeInTimers[c]=null;
-    } else {
-      C.player.setVolume(v+step);
-    }
-  },50);
-}
 
 function gmState(c,e){
   const C=ch[c];
   if(e.data===YT.PlayerState.PLAYING){
     C.playing=true;$(c+'-pb').textContent='⏸';$(c+'-novid').style.display='none';
-    fadeIn(c); // 재생 시작 시 페이드인
     startTimer(c);gmBroadcast(buildSync());
   } else if(e.data===YT.PlayerState.PAUSED){
     C.playing=false;$(c+'-pb').textContent='▶';stopTimer(c);gmBroadcast(buildSync());
@@ -635,10 +605,7 @@ function renderQ(c){
     <div class="qi ${i===C.idx?'on-'+c:''}" draggable="true" data-ch="${c}" data-i="${i}" onclick="gmPlayIdx('${c}',${i})">
       <span class="qi-drag">⠿</span>
       <span class="qi-num">${i===C.idx?'▶':i+1}</span>
-      ${item.isLocal
-        ?`<div class="qi-thumb" style="display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--bg3);">🎵</div>`
-        :`<img class="qi-thumb" src="https://img.youtube.com/vi/${item.id}/mqdefault.jpg" onerror="this.style.display='none'">`
-      }
+      <img class="qi-thumb" src="https://img.youtube.com/vi/${item.id}/mqdefault.jpg" onerror="this.style.display='none'">
       <div class="qi-info"><div class="qi-ttl">${item.title}</div>
       <div class="qi-id">${item.id}</div></div>
       <button class="qi-loop ${item.loop?'on':''}" onclick="event.stopPropagation();toggleTL('${c}',${i})">${item.loop?'🔁':'↩'}</button>
@@ -687,13 +654,6 @@ function updateMemo(c,i,val){
   saveSc();
 }
 function delTrack(c,i){
-  const item=ch[c].queue[i];
-  if(item?.isLocal&&c==='sfx'){
-    // IndexedDB에서도 삭제
-    deleteSFXFromDB(item.id);
-    delete sfxFileStore[item.id];
-    if(item.localUrl)URL.revokeObjectURL(item.localUrl);
-  }
   ch[c].queue.splice(i,1);
   if(ch[c].idx===i)ch[c].idx=-1;else if(ch[c].idx>i)ch[c].idx--;
   renderQ(c);saveSc();
@@ -713,66 +673,17 @@ function startLocalTimer(c,audio){
 }
 
 // GM 플레이어
-// 로컬 SFX 오디오 관리
-let localSFXAudio=null,localSFXTimer=null;
-function stopLocalSFX(){
-  if(localSFXAudio){localSFXAudio.pause();localSFXAudio=null;}
-  if(localSFXTimer){clearInterval(localSFXTimer);localSFXTimer=null;}
-}
-function startLocalSFXTimer(audio){
-  if(localSFXTimer)clearInterval(localSFXTimer);
-  localSFXTimer=setInterval(()=>{
-    if(!audio||audio.paused){
-      ch.sfx.playing=false;$('sfx-pb').textContent='▶';
-      clearInterval(localSFXTimer);localSFXTimer=null;return;
-    }
-    const cur=audio.currentTime||0,dur=audio.duration||0;
-    $('sfx-pf').style.width=(dur?cur/dur*100:0)+'%';
-    $('sfx-cur').textContent=fmt(cur);$('sfx-dur').textContent=fmt(dur);
-  },500);
-}
-
 function gmPlayIdx(c,i){
   const C=ch[c];
   if(i<0||i>=C.queue.length)return;
   C.idx=i;
-  const item=C.queue[i];
-  $(c+'-now').textContent=item.title;
+  if(!C.player||!C.player.loadVideoById)return;
+  C.player.loadVideoById(C.queue[i].id);
+  $(c+'-now').textContent=C.queue[i].title;
   $(c+'-novid').style.display='none';
   renderQ(c);
-
-  if(item.isLocal&&c==='sfx'){
-    // 로컬 SFX — Audio API로 GM에서 직접 재생
-    stopLocalSFX();
-    const audio=new Audio(item.localUrl);
-    audio.volume=parseInt($('sfx-vol').value)/100;
-    audio.loop=item.loop;
-    audio.play().catch(e=>toast('재생 오류: '+e.message));
-    localSFXAudio=audio;
-    C.playing=true;$('sfx-pb').textContent='⏸';
-    startLocalSFXTimer(audio);
-    audio.addEventListener('ended',()=>{
-      C.playing=false;$('sfx-pb').textContent='▶';
-      if(C.loop)gmPlayIdx(c,(C.idx+1)%C.queue.length);
-    });
-    gmBroadcast(buildSync());
-    return;
-  }
-
-  stopLocalSFX();
-  if(!C.player||!C.player.loadVideoById)return;
-  C.player.loadVideoById(item.id);
 }
-
-function gmToggle(c){
-  const C=ch[c];
-  if(c==='sfx'&&localSFXAudio){
-    if(C.playing){localSFXAudio.pause();C.playing=false;$('sfx-pb').textContent='▶';}
-    else{localSFXAudio.play();C.playing=true;$('sfx-pb').textContent='⏸';}
-    gmBroadcast(buildSync());return;
-  }
-  if(!C.player)return;C.playing?C.player.pauseVideo():C.player.playVideo();
-}
+function gmToggle(c){const C=ch[c];if(!C.player)return;C.playing?C.player.pauseVideo():C.player.playVideo();}
 function gmNext(c){const C=ch[c];if(C.idx<C.queue.length-1)gmPlayIdx(c,C.idx+1);}
 function gmPrev(c){const C=ch[c];if(C.idx>0)gmPlayIdx(c,C.idx-1);}
 function gmToggleLoop(c){
@@ -794,14 +705,7 @@ function startTimer(c){
 }
 function stopTimer(c){if(ch[c].timer){clearInterval(ch[c].timer);ch[c].timer=null;}}
 
-function buildSync(){
-  const snap=c=>{
-    const C=ch[c],item=C.idx>=0?C.queue[C.idx]:null;
-    const isLocal=item?.isLocal&&c==='sfx';
-    return{playing:C.playing,videoId:item&&!isLocal?item.id:'',fileId:isLocal?item.id:'',title:item?item.title:'',time:isLocal?(localSFXAudio?.currentTime||0):(C.player?.getCurrentTime?.()||0),ts:Date.now()};
-  };
-  return{type:'sync',bgm:snap('bgm'),sfx:snap('sfx'),ts:Date.now()};
-}
+function buildSync(){const snap=c=>{const C=ch[c];return{playing:C.playing,videoId:C.idx>=0?C.queue[C.idx].id:'',title:C.idx>=0?C.queue[C.idx].title:'',time:C.player?.getCurrentTime?.()||0,ts:Date.now()};};return{type:'sync',bgm:snap('bgm'),sfx:snap('sfx'),ts:Date.now()};}
 function gmBroadcast(msg){wsSend(myPeer,msg);}
 function gmForceSync(){gmBroadcast(buildSync());toast('🔄 동기화 전송');}
 function copyCode(){navigator.clipboard.writeText(sessionCode).then(()=>toast('📋 코드 복사: '+sessionCode));}
@@ -847,9 +751,6 @@ function joinPL(){
   myPeer=mkWS(code,plId,
     msg=>{
       if(msg.type==='sync'){plHandle(msg);}
-      else if(msg.type==='sfx-file-start') plSFXFileStart(msg);
-      else if(msg.type==='sfx-file-chunk') plSFXFileChunk(msg);
-      else if(msg.type==='sfx-file-end')   plSFXFileEnd(msg);
       else if(msg.type==='peer-join'&&msg.peerId==='GM'){
         wsSend(myPeer,{type:'sync-req',to:'GM'});
       }
@@ -938,50 +839,15 @@ function plHandle(d){
 
 
 
-const plFadeTimers={bgm:null,sfx:null};
-
-function plFadeIn(c,dur=3){
-  const p=plP[c];if(!p)return;
-  const target=70; // 항상 70으로 페이드인
-  if(plFadeTimers[c]){clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;}
-  p.setVolume(30);
-  const step=(target-30)/(dur*20);
-  plFadeTimers[c]=setInterval(()=>{
-    const v=p.getVolume?.()??30;
-    if(v+step>=target){
-      p.setVolume(target);
-      $('pl-'+c+'-vol').value=target;$('pl-'+c+'-vv').textContent=target;
-      clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;
-    } else {
-      p.setVolume(v+step);
-    }
-  },50);
-}
-
 function plApply(c,s){
   if(!s)return;
   if(s.title)$('pl-'+c+'-ttl').textContent=s.title;
-
-  // 로컬 SFX 파일 처리
-  if(s.fileId&&c==='sfx'){
-    const url=plSFXFiles[s.fileId];
-    if(url&&s.playing){
-      plPlaySFX(s.fileId);
-      $('pl-sfx-novid').style.display='none';
-    }
-    return;
-  }
-
   const p=plP[c];if(!p?.loadVideoById)return;
   const st=plSt[c];
   if(s.videoId&&s.videoId!==st.vid){
     st.vid=s.videoId;
-    if(s.playing){
-      p.loadVideoById({videoId:s.videoId,startSeconds:s.time||0});
-      plFadeIn(c);
-    } else {
-      p.cueVideoById({videoId:s.videoId,startSeconds:s.time||0});
-    }
+    if(s.playing){p.loadVideoById({videoId:s.videoId,startSeconds:s.time||0});}
+    else{p.cueVideoById({videoId:s.videoId,startSeconds:s.time||0});}
     $('pl-'+c+'-novid').style.display='none';
   } else if(s.videoId&&s.ts!==st.ts){
     const local=p.getCurrentTime?.()??0;
@@ -1005,7 +871,7 @@ function persist(){localStorage.setItem(SC_KEY,JSON.stringify(scenarios));}
 function saveSc(){
   const sc=scenarios.find(s=>s.id===curSc);if(!sc)return;
   sc.bgm=ch.bgm.queue.map(q=>({id:q.id,title:q.title,loop:q.loop,memo:q.memo||''}));
-  sc.sfx=ch.sfx.queue.map(q=>({id:q.id,title:q.title,loop:q.loop,memo:q.memo||'',isLocal:q.isLocal||false,fileName:q.fileName||'',fileType:q.fileType||'',fileSize:q.fileSize||0}));
+  sc.sfx=ch.sfx.queue.map(q=>({id:q.id,title:q.title,loop:q.loop,memo:q.memo||''}));
   persist();
 }
 function loadSc(id){
@@ -1060,14 +926,12 @@ function openSK(){$('sko').classList.add('open');}
 function closeSK(){$('sko').classList.remove('open');}
 function fadeCh(c,dur=3){
   const C=ch[c];if(!C.player)return;
-  const start=C.player.getVolume?.()??70;
-  if(fadeInTimers[c]){clearInterval(fadeInTimers[c]);fadeInTimers[c]=null;}
-  const step=start/(dur*20);
+  const start=C.player.getVolume?.()??70,step=start/(dur*20);
   const t=setInterval(()=>{
     const v=C.player.getVolume?.()??0;
     if(v-step<=0){
       C.player.setVolume(0);C.player.pauseVideo();clearInterval(t);
-      // 슬라이더도 0으로
+      // 볼륨 슬라이더 UI도 0으로
       $(c+'-vol').value=0;$(c+'-vv').textContent=0;
     }
     else C.player.setVolume(v-step);
@@ -1174,193 +1038,6 @@ function importScenarios(input){
   };
   reader.readAsText(file);
 }
-
-// ── SFX 로컬 파일 시스템 ──
-const MAX_SFX_FILE=5*1024*1024;
-const MAX_SFX_COUNT=20;
-const SFX_CHUNK=8*1024;
-const sfxFileStore={};  // GM측: fileId → {data, type, name} (메모리 캐시)
-
-// ── IndexedDB SFX 파일 저장 ──
-const IDB_NAME='trpg-watch-sfx';
-const IDB_STORE='files';
-let sfxDB=null;
-
-function openSFXDB(){
-  return new Promise((resolve,reject)=>{
-    if(sfxDB){resolve(sfxDB);return;}
-    const req=indexedDB.open(IDB_NAME,1);
-    req.onupgradeneeded=e=>{
-      e.target.result.createObjectStore(IDB_STORE,{keyPath:'id'});
-    };
-    req.onsuccess=e=>{sfxDB=e.target.result;resolve(sfxDB);};
-    req.onerror=()=>reject(req.error);
-  });
-}
-
-async function saveSFXToDB(fileId,data,type,name){
-  try{
-    const db=await openSFXDB();
-    return new Promise((resolve,reject)=>{
-      const tx=db.transaction(IDB_STORE,'readwrite');
-      tx.objectStore(IDB_STORE).put({id:fileId,data,type,name});
-      tx.oncomplete=resolve;tx.onerror=reject;
-    });
-  }catch(e){console.error('IndexedDB 저장 실패:',e);}
-}
-
-async function loadSFXFromDB(fileId){
-  try{
-    const db=await openSFXDB();
-    return new Promise((resolve,reject)=>{
-      const tx=db.transaction(IDB_STORE,'readonly');
-      const req=tx.objectStore(IDB_STORE).get(fileId);
-      req.onsuccess=()=>resolve(req.result||null);
-      req.onerror=reject;
-    });
-  }catch(e){return null;}
-}
-
-async function deleteSFXFromDB(fileId){
-  try{
-    const db=await openSFXDB();
-    return new Promise((resolve,reject)=>{
-      const tx=db.transaction(IDB_STORE,'readwrite');
-      tx.objectStore(IDB_STORE).delete(fileId);
-      tx.oncomplete=resolve;tx.onerror=reject;
-    });
-  }catch(e){}
-}
-
-async function loadAllSFXFromDB(){
-  // 저장된 파일 전부 메모리로 로드
-  try{
-    const db=await openSFXDB();
-    return new Promise((resolve,reject)=>{
-      const tx=db.transaction(IDB_STORE,'readonly');
-      const req=tx.objectStore(IDB_STORE).getAll();
-      req.onsuccess=()=>resolve(req.result||[]);
-      req.onerror=reject;
-    });
-  }catch(e){return [];}
-}
-
-async function restoreSFXFiles(){
-  // 앱 시작 시 IndexedDB에서 파일 복원
-  const saved=await loadAllSFXFromDB();
-  if(!saved.length)return;
-  // 큐에 있는 로컬 파일 중 sfxFileStore에 없는 것만 복원
-  for(const f of saved){
-    sfxFileStore[f.id]={data:f.data,type:f.type,name:f.name};
-    // localUrl 복원
-    const item=ch.sfx.queue.find(q=>q.id===f.id);
-    if(item&&!item.localUrl){
-      const blob=new Blob([f.data],{type:f.type});
-      item.localUrl=URL.createObjectURL(blob);
-    }
-  }
-  if(saved.length>0){
-    renderQ('sfx');
-    toast(`💾 SFX 파일 ${saved.length}개 복원됨`);
-  }
-}
-const plSFXFiles={};    // PL측: fileId → ObjectURL
-const plSFXRecv={};     // PL측 수신 버퍼
-
-function addSFXFiles(input){
-  const files=Array.from(input.files);
-  input.value='';
-  const localCount=ch.sfx.queue.filter(q=>q.isLocal).length;
-  let added=0;
-  for(const file of files){
-    if(localCount+added>=MAX_SFX_COUNT){toast(`⚠️ SFX 파일은 최대 ${MAX_SFX_COUNT}개까지 가능해요`);break;}
-    if(file.size>MAX_SFX_FILE){toast(`❌ ${file.name} — 5MB 초과`);continue;}
-    const fileId='sfx-local-'+Date.now()+'-'+Math.random().toString(36).slice(2,6);
-    const localUrl=URL.createObjectURL(file);
-    const item={id:fileId,title:file.name,loop:false,isLocal:true,localUrl,fileName:file.name,fileType:file.type,fileSize:file.size};
-    const reader=new FileReader();
-    reader.onload=e=>{
-      sfxFileStore[fileId]={data:e.target.result,type:file.type,name:file.name};
-      // IndexedDB에 저장
-      saveSFXToDB(fileId,e.target.result,file.type,file.name);
-      // 현재 접속 중인 PL에게 즉시 전송
-      if(myPeer?.readyState===WebSocket.OPEN&&plCount>0){
-        gmSendSFXFile(fileId,null);
-        toast(`📤 ${file.name} 전송 중...`);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-    ch.sfx.queue.push(item);
-    added++;
-  }
-  if(added>0){renderQ('sfx');saveSc();toast(`✅ SFX ${added}개 추가됨`);}
-}
-
-function gmSendSFXFile(fileId,targetPeer){
-  const f=sfxFileStore[fileId];if(!f)return;
-  const buf=f.data,total=buf.byteLength,chunks=Math.ceil(total/SFX_CHUNK);
-  const send=msg=>wsSend(myPeer,targetPeer?{...msg,to:targetPeer}:msg);
-  send({type:'sfx-file-start',fileId,fileName:f.name,fileType:f.type,fileSize:total,chunks});
-  let i=0;
-  function next(){
-    if(i>=chunks){send({type:'sfx-file-end',fileId});return;}
-    const slice=buf.slice(i*SFX_CHUNK,Math.min((i+1)*SFX_CHUNK,total));
-    const u8=new Uint8Array(slice);let bin='';
-    for(let j=0;j<u8.length;j++)bin+=String.fromCharCode(u8[j]);
-    send({type:'sfx-file-chunk',fileId,i,data:btoa(bin)});
-    i++;setTimeout(next,10);
-  }
-  next();
-}
-
-function gmSendAllSFXFiles(targetPeer){
-  const items=ch.sfx.queue.filter(q=>q.isLocal&&sfxFileStore[q.id]);
-  if(!items.length)return;
-  toast(`📤 SFX 파일 ${items.length}개 전송 시작...`);
-  let idx=0;
-  function sendNext(){
-    if(idx>=items.length)return;
-    gmSendSFXFile(items[idx++].id,targetPeer);
-    setTimeout(sendNext,300);
-  }
-  sendNext();
-}
-
-// PL측 수신
-function plSFXFileStart(d){
-  plSFXRecv[d.fileId]={fileName:d.fileName,fileType:d.fileType,chunks:d.chunks,received:[],count:0};
-  updPlSFXProgress();
-}
-function plSFXFileChunk(d){
-  const r=plSFXRecv[d.fileId];if(!r)return;
-  const bin=atob(d.data),buf=new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++)buf[i]=bin.charCodeAt(i);
-  r.received[d.i]=buf.buffer;r.count++;updPlSFXProgress();
-}
-function plSFXFileEnd(d){
-  const r=plSFXRecv[d.fileId];if(!r)return;
-  if(r.count!==r.chunks){delete plSFXRecv[d.fileId];updPlSFXProgress();return;}
-  const ordered=[];for(let i=0;i<r.chunks;i++)ordered.push(r.received[i]);
-  plSFXFiles[d.fileId]=URL.createObjectURL(new Blob(ordered,{type:r.fileType||'audio/mpeg'}));
-  delete plSFXRecv[d.fileId];updPlSFXProgress();
-  toast(`✅ SFX 수신: ${r.fileName}`);
-}
-function updPlSFXProgress(){
-  const el=$('pl-sfx-dl');if(!el)return;
-  const pending=Object.keys(plSFXRecv).length;
-  if(!pending){el.textContent='';return;}
-  const total=Object.values(plSFXRecv).reduce((s,r)=>s+r.chunks,0);
-  const done=Object.values(plSFXRecv).reduce((s,r)=>s+r.count,0);
-  el.textContent=`📥 수신 중 ${Math.round(done/total*100)}%`;
-}
-function plPlaySFX(fileId){
-  const url=plSFXFiles[fileId];
-  if(!url){toast('⚠️ SFX 파일 수신 중...');return;}
-  const audio=new Audio(url);
-  audio.volume=parseInt($('pl-sfx-vol').value)/100;
-  audio.play().catch(()=>{});
-}
-
 let keepAliveTimer=null;
 function startKeepAlive(){
   if(keepAliveTimer)return;
