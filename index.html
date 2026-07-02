@@ -986,11 +986,16 @@ function plApply(c,s){
       p.cueVideoById({videoId:s.videoId,startSeconds:s.time||0});
     }
     $('pl-'+c+'-novid').style.display='none';
-  } else if(s.videoId&&s.ts!==st.ts){
+  } else if(s.videoId){
+    // 같은 영상 — 재생 상태 맞추기
     const local=p.getCurrentTime?.()??0;
     if(Math.abs((s.time||0)-local)>2)p.seekTo(s.time||0,true);
-    if(s.playing){p.playVideo?.();}
-    else{p.pauseVideo?.();}
+    const playerState=p.getPlayerState?.();
+    if(s.playing&&playerState!==1){
+      p.playVideo?.(); // 재생 중이 아닌데 playing:true면 재생
+    } else if(!s.playing&&playerState===1){
+      p.pauseVideo?.(); // 재생 중인데 playing:false면 정지
+    }
   }
   st.ts=s.ts;
 }
