@@ -546,7 +546,7 @@ function startGM(){
       } else if(msg.type==='peer-leave'){
         plCount=Math.max(0,plCount-1);updOnline();toast('🎭 플레이어 퇴장');
       } else if(msg.type==='sync-req'){
-        wsSend(myPeer,{...buildSync(),to:msg.from,forceReload:true});
+        wsSend(myPeer,{...buildSync(),to:msg.from});
       }
     },
     ()=>{toast('👑 세션 시작! 코드: '+sessionCode);startKeepAlive();},
@@ -572,8 +572,8 @@ function fadeIn(c,dur=3){
   const C=ch[c];if(!C.player)return;
   const target=70; // 항상 70으로 페이드인
   if(fadeInTimers[c]){clearInterval(fadeInTimers[c]);fadeInTimers[c]=null;}
-  C.player.setVolume(1); // 0이면 재생 차단될 수 있어서 1로 시작
-  const step=(target-1)/(dur*20);
+  C.player.setVolume(0);
+  const step=target/(dur*20);
   fadeInTimers[c]=setInterval(()=>{
     const v=C.player.getVolume?.()??0;
     if(v+step>=target){
@@ -867,27 +867,25 @@ function joinPL(){
     plP.bgm=makePlayer('pl-bgm-yt',70,
       e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-bgm-novid').style.display='none';},
       ()=>{
-        setTimeout(()=>{
-          if(plLastSync&&plAudioUnlocked) plApply('bgm',plLastSync.bgm);
-          else if(plLastSync?.bgm?.videoId){
-            plP.bgm.cueVideoById({videoId:plLastSync.bgm.videoId,startSeconds:plLastSync.bgm.time||0});
-            $('pl-bgm-novid').style.display='none';
-            if(plLastSync.bgm.title) $('pl-bgm-ttl').textContent=plLastSync.bgm.title;
-          }
-        },800);
+        // 플레이어 준비 완료 — 언락됐으면 바로 적용
+        if(plLastSync&&plAudioUnlocked) plApply('bgm',plLastSync.bgm);
+        // 언락 안 됐어도 cue는 해둬서 화면에 미리 보여주기
+        else if(plLastSync?.bgm?.videoId){
+          plP.bgm.cueVideoById({videoId:plLastSync.bgm.videoId,startSeconds:plLastSync.bgm.time||0});
+          $('pl-bgm-novid').style.display='none';
+          if(plLastSync.bgm.title) $('pl-bgm-ttl').textContent=plLastSync.bgm.title;
+        }
       }
     );
     plP.sfx=makePlayer('pl-sfx-yt',80,
       e=>{if(e.data===YT.PlayerState.PLAYING)$('pl-sfx-novid').style.display='none';},
       ()=>{
-        setTimeout(()=>{
-          if(plLastSync&&plAudioUnlocked) plApply('sfx',plLastSync.sfx);
-          else if(plLastSync?.sfx?.videoId){
-            plP.sfx.cueVideoById({videoId:plLastSync.sfx.videoId,startSeconds:plLastSync.sfx.time||0});
-            $('pl-sfx-novid').style.display='none';
-            if(plLastSync.sfx.title) $('pl-sfx-ttl').textContent=plLastSync.sfx.title;
-          }
-        },800);
+        if(plLastSync&&plAudioUnlocked) plApply('sfx',plLastSync.sfx);
+        else if(plLastSync?.sfx?.videoId){
+          plP.sfx.cueVideoById({videoId:plLastSync.sfx.videoId,startSeconds:plLastSync.sfx.time||0});
+          $('pl-sfx-novid').style.display='none';
+          if(plLastSync.sfx.title) $('pl-sfx-ttl').textContent=plLastSync.sfx.title;
+        }
       }
     );
   });
@@ -912,10 +910,11 @@ function plUnlockAudio(){
       plAudioUnlocked=true;
       $('pl-unlock').style.display='none';
       toast('✅ 오디오 활성화됨! 탭 전환해도 재생됩니다.');
-      // 언락 후 GM에게 최신 sync 재요청
-      setTimeout(()=>{
-        wsSend(myPeer,{type:'sync-req',to:'GM'});
-      },300);
+      // 언락 후 대기 중 sync 즉시 적용 (플레이어 준비 여부 무관하게 저장, onReady에서 처리)
+      if(plLastSync){
+        if(plP.bgm?.loadVideoById) plApply('bgm',plLastSync.bgm);
+        if(plP.sfx?.loadVideoById) plApply('sfx',plLastSync.sfx);
+      }
     });
   }catch(e){
     plAudioUnlocked=true;
@@ -929,12 +928,8 @@ function plUnlockAudio(){
 
 function plHandle(d){
   if(!d||d.type!=='sync')return;
-  // sync-req 응답으로 온 새 sync면 vid 리셋해서 강제 재로드
-  if(d.forceReload){
-    plSt.bgm.vid='';
-    plSt.sfx.vid='';
-  }
   plLastSync=d;
+  // 언락됐으면 적용 시도, 플레이어 미준비면 onReady에서 처리
   if(plAudioUnlocked){
     if(plP.bgm?.loadVideoById) plApply('bgm',d.bgm);
     if(plP.sfx?.loadVideoById) plApply('sfx',d.sfx);
@@ -947,12 +942,12 @@ const plFadeTimers={bgm:null,sfx:null};
 
 function plFadeIn(c,dur=3){
   const p=plP[c];if(!p)return;
-  const target=70;
+  const target=70; // 항상 70으로 페이드인
   if(plFadeTimers[c]){clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;}
-  p.setVolume(1); // 0이면 autoplay 차단될 수 있어서 1로 시작
-  const step=(target-1)/(dur*20);
+  p.setVolume(30);
+  const step=(target-30)/(dur*20);
   plFadeTimers[c]=setInterval(()=>{
-    const v=p.getVolume?.()??1;
+    const v=p.getVolume?.()??30;
     if(v+step>=target){
       p.setVolume(target);
       $('pl-'+c+'-vol').value=target;$('pl-'+c+'-vv').textContent=target;
@@ -988,16 +983,10 @@ function plApply(c,s){
       p.cueVideoById({videoId:s.videoId,startSeconds:s.time||0});
     }
     $('pl-'+c+'-novid').style.display='none';
-  } else if(s.videoId){
-    // 같은 영상 — 재생 상태 맞추기
+  } else if(s.videoId&&s.ts!==st.ts){
     const local=p.getCurrentTime?.()??0;
     if(Math.abs((s.time||0)-local)>2)p.seekTo(s.time||0,true);
-    const playerState=p.getPlayerState?.();
-    if(s.playing&&playerState!==1){
-      p.playVideo?.(); // 재생 중이 아닌데 playing:true면 재생
-    } else if(!s.playing&&playerState===1){
-      p.pauseVideo?.(); // 재생 중인데 playing:false면 정지
-    }
+    setTimeout(()=>{s.playing?p.playVideo?.():p.pauseVideo?.();},300);
   }
   st.ts=s.ts;
 }
