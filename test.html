@@ -889,9 +889,10 @@ function loadSc(id){
 function renderScDrop(){
   const el=$('sc-drop');if(!el)return;
   el.innerHTML=scenarios.map(sc=>`
-    <div class="drop-opt ${sc.id===curSc?'active':''}" onclick="switchSc('${sc.id}')">
+    <div class="drop-opt ${sc.id===curSc?'active':''}" onclick="switchSc('${sc.id}')" id="sc-opt-${sc.id}">
       <span style="min-width:10px">${sc.id===curSc?'▶':''}</span>
-      <span style="flex:1">${sc.name}</span>
+      <span style="flex:1" id="sc-lbl-${sc.id}">${sc.name}</span>
+      <button class="drop-del" style="opacity:1;color:var(--muted);font-size:11px;" onclick="renameSc('${sc.id}',event)" title="이름 변경">✏️</button>
       <button class="drop-del" onclick="deleteSc('${sc.id}',event)">✕</button>
     </div>`).join('')+
     `<div class="drop-div"></div>
@@ -899,8 +900,40 @@ function renderScDrop(){
        <input id="sc-new-inp" style="flex:1;padding:4px 7px;background:var(--bg2);border:1px solid var(--ba);border-radius:4px;color:var(--text);font-size:11px;font-family:inherit;outline:none;" placeholder="새 시나리오 이름" onkeydown="if(event.key==='Enter')newSc()" onclick="event.stopPropagation()">
        <button style="padding:4px 8px;border:none;border-radius:4px;background:var(--a);color:#1a1200;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;" onclick="newSc(event)">추가</button>
      </div>`;
-  // 입력창 자동 포커스
   setTimeout(()=>{const inp=$('sc-new-inp');if(inp)inp.focus();},50);
+}
+
+function renameSc(id,e){
+  e.stopPropagation();
+  const sc=scenarios.find(s=>s.id===id);if(!sc)return;
+  const lbl=$('sc-lbl-'+id);if(!lbl)return;
+  const opt=$('sc-opt-'+id);
+
+  // 인라인 입력창으로 교체
+  const inp=document.createElement('input');
+  inp.value=sc.name;
+  inp.style.cssText='flex:1;padding:2px 5px;background:var(--bg2);border:1px solid var(--a);border-radius:4px;color:var(--text);font-size:11px;font-family:inherit;outline:none;';
+  inp.onclick=e=>e.stopPropagation();
+
+  const confirm=()=>{
+    const newName=inp.value.trim();
+    if(newName&&newName!==sc.name){
+      sc.name=newName;
+      persist();
+      if(curSc===id)$('sc-name').textContent=newName;
+      toast('✏️ 이름 변경됨: '+newName);
+    }
+    renderScDrop();
+  };
+  inp.onkeydown=e=>{
+    e.stopPropagation();
+    if(e.key==='Enter')confirm();
+    if(e.key==='Escape')renderScDrop();
+  };
+  inp.onblur=confirm;
+
+  lbl.replaceWith(inp);
+  inp.focus();inp.select();
 }
 function switchSc(id){
   saveSc();loadSc(id);closeAllDrops();
