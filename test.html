@@ -308,7 +308,7 @@ input[type=range]{cursor:pointer;}
         <button class="cb2" onclick="gmPrev('sfx')">⏮</button>
         <button class="cb2 play-b" id="sfx-pb" onclick="gmToggle('sfx')">▶</button>
         <button class="cb2" onclick="gmNext('sfx')">⏭</button>
-        <button class="cb2" id="sfx-lb" onclick="gmToggleLoop('sfx')" title="채널 루프">🔁</button>
+        <button class="cb2" id="sfx-lb" onclick="gmToggleLoop('sfx')" title="채널 루프">↩</button>
         <div class="vwrap"><span>🔊</span><input type="range" class="vol-b" id="sfx-vol" min="0" max="100" value="80" oninput="gmVol('sfx',this.value)"><span id="sfx-vv">80</span></div>
       </div>
     </div>
@@ -712,7 +712,9 @@ function gmNext(c){const C=ch[c];if(C.idx<C.queue.length-1)gmPlayIdx(c,C.idx+1);
 function gmPrev(c){const C=ch[c];if(C.idx>0)gmPlayIdx(c,C.idx-1);}
 function gmToggleLoop(c){
   ch[c].loop=!ch[c].loop;
-  $(c+'-lb').classList.toggle(c==='bgm'?'on-a':'on-b',ch[c].loop);
+  const btn=$(c+'-lb');
+  btn.classList.toggle(c==='bgm'?'on-a':'on-b',ch[c].loop);
+  btn.textContent=ch[c].loop?'🔁':'↩';
   toast(ch[c].loop?'🔁 채널 루프 ON':'↩ 채널 루프 OFF');
 }
 function gmSeek(c,e){const C=ch[c];if(!C.player)return;const r=e.currentTarget.getBoundingClientRect();C.player.seekTo(((e.clientX-r.left)/r.width)*(C.player.getDuration()||0),true);setTimeout(()=>gmBroadcast(buildSync()),300);}
