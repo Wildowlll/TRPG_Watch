@@ -776,31 +776,37 @@ function stopLocalSFX(){if(localSFXAudio){localSFXAudio.pause();localSFXAudio=nu
 
 function playLocalSFXGM(item){
   stopLocalSFX();
-  const audio=new Audio(item.localUrl);
+  // 큐에서 현재 item 참조 (루프 상태가 바뀌었을 수 있으므로)
+  const currentItem=ch.sfx.queue[ch.sfx.idx]||item;
+  const audio=new Audio(currentItem.localUrl);
   audio.volume=parseInt($('sfx-vol').value)/100;
-  audio.loop=item.loop;
+  audio.loop=false; // ended 이벤트로 직접 처리
   audio.play().catch(e=>toast('재생 오류: '+e.message));
   localSFXAudio=audio;
   ch.sfx.playing=true;$('sfx-pb').textContent='⏸';
-  $('sfx-now').textContent=item.title;
+  $('sfx-now').textContent=currentItem.title;
   $('sfx-novid').style.display='none';
   // 진행바
   if(ch.sfx.timer)clearInterval(ch.sfx.timer);
   ch.sfx.timer=setInterval(()=>{
-    if(!localSFXAudio||localSFXAudio.paused){
-      ch.sfx.playing=false;$('sfx-pb').textContent='▶';
-      clearInterval(ch.sfx.timer);ch.sfx.timer=null;
-      if(ch.sfx.loop&&!item.loop)gmPlayIdx('sfx',(ch.sfx.idx+1)%ch.sfx.queue.length);
-      return;
-    }
+    if(!localSFXAudio)return;
     const cur=localSFXAudio.currentTime||0,dur=localSFXAudio.duration||0;
     $('sfx-pf').style.width=(dur?cur/dur*100:0)+'%';
     $('sfx-cur').textContent=fmt(cur);$('sfx-dur').textContent=fmt(dur);
   },500);
   audio.addEventListener('ended',()=>{
     ch.sfx.playing=false;$('sfx-pb').textContent='▶';
-    if(item.loop)playLocalSFXGM(item);
-    else if(ch.sfx.loop)gmPlayIdx('sfx',(ch.sfx.idx+1)%ch.sfx.queue.length);
+    clearInterval(ch.sfx.timer);ch.sfx.timer=null;
+    // 루프 상태는 ended 시점의 큐 item에서 다시 읽기
+    const latestItem=ch.sfx.queue[ch.sfx.idx];
+    if(latestItem?.loop){
+      // 트랙 루프
+      playLocalSFXGM(latestItem);
+    } else if(ch.sfx.loop){
+      // 채널 루프 (다음 트랙)
+      gmPlayIdx('sfx',(ch.sfx.idx+1)%ch.sfx.queue.length);
+    }
+    // 루프 없으면 그냥 종료
   });
   gmBroadcast(buildSync());
 }
