@@ -572,9 +572,10 @@ function gmState(c,e){
       const item=C.queue[C.idx];
       if(item&&item.loop) gmPlayIdx(c,C.idx);
       else if(C.loop) gmPlayIdx(c,(C.idx+1)%C.queue.length);
-      else gmNext(c);
+      // 루프 없으면 그냥 멈춤
     } else {
-      C.loop?gmPlayIdx(c,C.idx):gmNext(c);
+      // BGM: 루프면 같은 곡 반복, 아니면 그냥 멈춤
+      if(C.loop) gmPlayIdx(c,C.idx);
     }
   }
 }
