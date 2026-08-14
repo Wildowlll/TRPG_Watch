@@ -308,7 +308,7 @@ input[type=range]{cursor:pointer;}
         <button class="cb2" onclick="gmPrev('sfx')">⏮</button>
         <button class="cb2 play-b" id="sfx-pb" onclick="gmToggle('sfx')">▶</button>
         <button class="cb2" onclick="gmNext('sfx')">⏭</button>
-        <button class="cb2 on-b" id="sfx-lb" onclick="gmToggleLoop('sfx')" title="채널 루프">🔁</button>
+        <button class="cb2" id="sfx-lb" onclick="gmToggleLoop('sfx')" title="채널 루프">🔁</button>
         <div class="vwrap"><span>🔊</span><input type="range" class="vol-b" id="sfx-vol" min="0" max="100" value="80" oninput="gmVol('sfx',this.value)"><span id="sfx-vv">80</span></div>
       </div>
     </div>
@@ -427,7 +427,7 @@ function ytId(url){const ps=[/[?&]v=([^&#]+)/,/youtu\.be\/([^?&#]+)/,/youtube\.c
 // ── 상태 ──
 const ch={
   bgm:{player:null,queue:[],idx:-1,playing:false,loop:true,timer:null},
-  sfx:{player:null,queue:[],idx:-1,playing:false,loop:true,timer:null}
+  sfx:{player:null,queue:[],idx:-1,playing:false,loop:false,timer:null}
 };
 let role='',myPeer=null,sessionCode='';
 let plCount=0; // 연결된 PL 수
