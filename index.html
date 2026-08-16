@@ -180,7 +180,7 @@ input[type=range]{cursor:pointer;}
 .picker-btn:hover{border-color:var(--a);color:var(--a);}
 .picker-dot{width:8px;height:8px;border-radius:50%;background:var(--a);flex-shrink:0;}
 .picker-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;}
-.drop{display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--bg1);border:1px solid var(--ba);border-radius:var(--r);z-index:400;min-width:175px;box-shadow:0 8px 24px rgba(0,0,0,0.45);overflow:hidden;}
+.drop{display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--bg1);border:1px solid var(--ba);border-radius:var(--r);z-index:400;min-width:175px;box-shadow:0 8px 24px rgba(0,0,0,0.45);overflow:hidden;max-height:60vh;overflow-y:auto;}
 .drop.open{display:block;}
 .drop-r{right:0;left:auto;}
 .drop-opt{display:flex;align-items:center;gap:7px;padding:7px 11px;cursor:pointer;font-size:12px;transition:background 0.1s;color:var(--text);}
