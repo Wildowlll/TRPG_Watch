@@ -297,7 +297,7 @@ input[type=range]{cursor:pointer;}
         <button class="cb2" onclick="gmPrev('bgm')">⏮</button>
         <button class="cb2 play-a" id="bgm-pb" onclick="gmToggle('bgm')">▶</button>
         <button class="cb2" onclick="gmNext('bgm')">⏭</button>
-        <button class="cb2 on-a" id="bgm-lb" onclick="gmToggleLoop('bgm')" title="루프">🔁</button>
+        <button class="cb2 on-a" id="bgm-lb" onclick="gmToggleLoop('bgm')" title="재생 모드">🔁</button>
         <div class="vwrap"><span>🔊</span><input type="range" class="vol-a" id="bgm-vol" min="0" max="100" value="70" oninput="gmVol('bgm',this.value)"><span id="bgm-vv">70</span></div>
       </div>
     </div>
@@ -426,8 +426,8 @@ function ytId(url){const ps=[/[?&]v=([^&#]+)/,/youtu\.be\/([^?&#]+)/,/youtube\.c
 
 // ── 상태 ──
 const ch={
-  bgm:{player:null,queue:[],idx:-1,playing:false,loop:true,timer:null},
-  sfx:{player:null,queue:[],idx:-1,playing:false,loop:false,timer:null}
+  bgm:{player:null,queue:[],idx:-1,playing:false,loop:'loop',timer:null},
+  sfx:{player:null,queue:[],idx:-1,playing:false,loop:'stop',timer:null}
 };
 let role='',myPeer=null,sessionCode='';
 let plCount=0; // 연결된 PL 수
@@ -570,12 +570,14 @@ function gmState(c,e){
     stopTimer(c);
     if(c==='sfx'){
       const item=C.queue[C.idx];
-      if(item&&item.loop) gmPlayIdx(c,C.idx);
-      else if(C.loop) gmPlayIdx(c,(C.idx+1)%C.queue.length);
-      // 루프 없으면 그냥 멈춤
+      if(item&&item.loop) gmPlayIdx(c,C.idx);           // 트랙 루프
+      else if(C.loop==='loop') gmPlayIdx(c,(C.idx+1)%C.queue.length); // 채널 루프
+      // stop이면 멈춤
     } else {
-      // BGM: 루프면 같은 곡 반복, 아니면 그냥 멈춤
-      if(C.loop) gmPlayIdx(c,C.idx);
+      // BGM 3단계
+      if(C.loop==='loop') gmPlayIdx(c,C.idx);           // 같은 곡 반복
+      else if(C.loop==='next') gmPlayIdx(c,(C.idx+1)%C.queue.length); // 다음 곡
+      // stop이면 멈춤
     }
   }
 }
@@ -712,11 +714,16 @@ function gmToggle(c){
 function gmNext(c){const C=ch[c];if(C.idx<C.queue.length-1)gmPlayIdx(c,C.idx+1);}
 function gmPrev(c){const C=ch[c];if(C.idx>0)gmPlayIdx(c,C.idx-1);}
 function gmToggleLoop(c){
-  ch[c].loop=!ch[c].loop;
+  const modes=c==='bgm'?['loop','next','stop']:['loop','stop'];
+  const cur=modes.indexOf(ch[c].loop);
+  ch[c].loop=modes[(cur+1)%modes.length];
+  const icons={loop:'🔁',next:'⏭',stop:'↩'};
+  const cls={loop:c==='bgm'?'on-a':'on-b',next:c==='bgm'?'on-a':'on-b',stop:''};
   const btn=$(c+'-lb');
-  btn.classList.toggle(c==='bgm'?'on-a':'on-b',ch[c].loop);
-  btn.textContent=ch[c].loop?'🔁':'↩';
-  toast(ch[c].loop?'🔁 채널 루프 ON':'↩ 채널 루프 OFF');
+  btn.className='cb2 '+cls[ch[c].loop];
+  btn.textContent=icons[ch[c].loop];
+  const labels={loop:'🔁 같은 곡 반복',next:'⏭ 다음 곡 자동재생',stop:'↩ 1곡 후 멈춤'};
+  toast(labels[ch[c].loop]);
 }
 function gmSeek(c,e){const C=ch[c];if(!C.player)return;const r=e.currentTarget.getBoundingClientRect();C.player.seekTo(((e.clientX-r.left)/r.width)*(C.player.getDuration()||0),true);setTimeout(()=>gmBroadcast(buildSync()),300);}
 function gmVol(c,v){$(c+'-vv').textContent=v;if(ch[c].player)ch[c].player.setVolume(+v);}
@@ -800,16 +807,12 @@ function playLocalSFXGM(item){
   audio.addEventListener('ended',()=>{
     ch.sfx.playing=false;$('sfx-pb').textContent='▶';
     clearInterval(ch.sfx.timer);ch.sfx.timer=null;
-    // 루프 상태는 ended 시점의 큐 item에서 다시 읽기
     const latestItem=ch.sfx.queue[ch.sfx.idx];
     if(latestItem?.loop){
-      // 트랙 루프
       playLocalSFXGM(latestItem);
-    } else if(ch.sfx.loop){
-      // 채널 루프 (다음 트랙)
+    } else if(ch.sfx.loop==='loop'){
       gmPlayIdx('sfx',(ch.sfx.idx+1)%ch.sfx.queue.length);
     }
-    // 루프 없으면 그냥 종료
   });
   gmBroadcast(buildSync());
 }
