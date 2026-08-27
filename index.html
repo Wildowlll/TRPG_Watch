@@ -692,6 +692,15 @@ function gmPlayIdx(c,i){
   C.idx=i;
   const item=C.queue[i];
   renderQ(c);
+
+  // 볼륨이 0이면 70으로 복원
+  const vol=C.player?.getVolume?.()??parseInt($(c+'-vol').value);
+  if(vol===0){
+    const defaultVol=70;
+    if(C.player)C.player.setVolume(defaultVol);
+    $(c+'-vol').value=defaultVol;$(c+'-vv').textContent=defaultVol;
+  }
+
   if(item.isLocal&&c==='sfx'){
     playLocalSFXGM(item);
     return;
