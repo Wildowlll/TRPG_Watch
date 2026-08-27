@@ -898,6 +898,7 @@ function joinPL(){
   myPeer=mkWS(code,plId,
     msg=>{
       if(msg.type==='sync'){plHandle(msg);}
+      else if(msg.type==='fadeout'){plFadeOut(msg.ch);}
       else if(msg.type==='peer-join'&&msg.peerId==='GM'){
         wsSend(myPeer,{type:'sync-req',to:'GM'});
       }
@@ -972,6 +973,23 @@ function plUnlockAudio(){
       plApply('sfx',plLastSync.sfx);
     }
   }
+}
+
+function plFadeOut(c,dur=3){
+  const p=plP[c];if(!p)return;
+  const start=p.getVolume?.()??70;
+  const step=start/(dur*20);
+  if(plFadeTimers[c]){clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;}
+  plFadeTimers[c]=setInterval(()=>{
+    const v=p.getVolume?.()??0;
+    if(v-step<=0){
+      p.setVolume(0);p.pauseVideo?.();
+      $('pl-'+c+'-vol').value=0;$('pl-'+c+'-vv').textContent=0;
+      clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;
+    } else {
+      p.setVolume(v-step);
+    }
+  },50);
 }
 
 function plHandle(d){
@@ -1136,8 +1154,8 @@ document.addEventListener('keydown',e=>{
     case'ArrowRight':e.preventDefault();gmNext('bgm');break;
     case'ArrowUp':e.preventDefault();gmPrev('sfx');break;
     case'ArrowDown':e.preventDefault();gmNext('sfx');break;
-    case'f':case'F':fadeCh('bgm');toast('🎵 BGM 페이드아웃');break;
-    case'g':case'G':fadeCh('sfx');toast('⚡ SFX 페이드아웃');break;
+    case'f':case'F':fadeCh('bgm');gmBroadcast({type:'fadeout',ch:'bgm'});toast('🎵 BGM 페이드아웃');break;
+    case'g':case'G':fadeCh('sfx');gmBroadcast({type:'fadeout',ch:'sfx'});toast('⚡ SFX 페이드아웃');break;
     case'm':case'M':
       isMuted=!isMuted;
       ['bgm','sfx'].forEach(c=>{
