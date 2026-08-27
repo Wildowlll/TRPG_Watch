@@ -975,6 +975,26 @@ function plUnlockAudio(){
   }
 }
 
+const plFadeTimers={bgm:null,sfx:null};
+
+function plFadeIn(c,dur=3){
+  const p=plP[c];if(!p)return;
+  const target=70;
+  if(plFadeTimers[c]){clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;}
+  p.setVolume(1);
+  const step=(target-1)/(dur*20);
+  plFadeTimers[c]=setInterval(()=>{
+    const v=p.getVolume?.()??1;
+    if(v+step>=target){
+      p.setVolume(target);
+      $('pl-'+c+'-vol').value=target;$('pl-'+c+'-vv').textContent=target;
+      clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;
+    } else {
+      p.setVolume(v+step);
+    }
+  },50);
+}
+
 function plFadeOut(c,dur=3){
   const p=plP[c];if(!p)return;
   const start=p.getVolume?.()??70;
