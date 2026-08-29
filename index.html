@@ -443,20 +443,28 @@ function mkWS(sid,pid,onMsg,onOpen,onClose,_retry=0){
   });
   ws.addEventListener('message',e=>{try{onMsg(JSON.parse(e.data));}catch(err){}});
   ws.addEventListener('close',e=>{
-    (onClose||(()=>{}))(e);
-    // 정상 종료(1000)가 아니면 자동 재연결
     if(!opened||e.code!==1000){
+      // 연결 실패 or 비정상 종료 → 재시도
       if(_retry<5){
-        const delay=Math.min(1000*Math.pow(2,_retry),16000); // 1s,2s,4s,8s,16s
-        toast(`🔄 연결 재시도 중... (${_retry+1}/5)`);
+        const delay=Math.min(1000*Math.pow(2,_retry),16000);
+        // PL 화면이면 재연결 중 표시
+        if(role==='pl'){
+          $('pl-conn').textContent=`재연결 중... (${_retry+1}/5)`;
+          $('pl-conn').className='conn-b cb-w';
+        }
         setTimeout(()=>{
           if(role==='gm'||role==='pl'){
             myPeer=mkWS(sid,pid,onMsg,onOpen,onClose,_retry+1);
           }
         },delay);
       } else {
+        // 5번 다 실패하면 onClose 호출
+        (onClose||(()=>{}))(e);
         toast('❌ 연결 실패. 새로고침 해주세요.');
       }
+    } else {
+      // 정상 종료
+      (onClose||(()=>{}))(e);
     }
   });
   ws.addEventListener('error',()=>{});
