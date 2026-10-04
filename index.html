@@ -180,7 +180,7 @@ input[type=range]{cursor:pointer;}
 .picker-btn:hover{border-color:var(--a);color:var(--a);}
 .picker-dot{width:8px;height:8px;border-radius:50%;background:var(--a);flex-shrink:0;}
 .picker-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;}
-.drop{display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--bg1);border:1px solid var(--ba);border-radius:var(--r);z-index:400;min-width:175px;box-shadow:0 8px 24px rgba(0,0,0,0.45);overflow:hidden;max-height:60vh;overflow-y:auto;}
+.drop{display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--bg1);border:1px solid var(--ba);border-radius:var(--r);z-index:400;min-width:175px;box-shadow:0 8px 24px rgba(0,0,0,0.45);overflow:hidden;}
 .drop.open{display:block;}
 .drop-r{right:0;left:auto;}
 .drop-opt{display:flex;align-items:center;gap:7px;padding:7px 11px;cursor:pointer;font-size:12px;transition:background 0.1s;color:var(--text);}
@@ -297,7 +297,7 @@ input[type=range]{cursor:pointer;}
         <button class="cb2" onclick="gmPrev('bgm')">⏮</button>
         <button class="cb2 play-a" id="bgm-pb" onclick="gmToggle('bgm')">▶</button>
         <button class="cb2" onclick="gmNext('bgm')">⏭</button>
-        <button class="cb2 on-a" id="bgm-lb" onclick="gmToggleLoop('bgm')" title="재생 모드">🔁</button>
+        <button class="cb2 on-a" id="bgm-lb" onclick="gmToggleLoop('bgm')" title="루프">🔁</button>
         <div class="vwrap"><span>🔊</span><input type="range" class="vol-a" id="bgm-vol" min="0" max="100" value="70" oninput="gmVol('bgm',this.value)"><span id="bgm-vv">70</span></div>
       </div>
     </div>
@@ -308,7 +308,7 @@ input[type=range]{cursor:pointer;}
         <button class="cb2" onclick="gmPrev('sfx')">⏮</button>
         <button class="cb2 play-b" id="sfx-pb" onclick="gmToggle('sfx')">▶</button>
         <button class="cb2" onclick="gmNext('sfx')">⏭</button>
-        <button class="cb2" id="sfx-lb" onclick="gmToggleLoop('sfx')" title="채널 루프">↩</button>
+        <button class="cb2 on-b" id="sfx-lb" onclick="gmToggleLoop('sfx')" title="채널 루프">🔁</button>
         <div class="vwrap"><span>🔊</span><input type="range" class="vol-b" id="sfx-vol" min="0" max="100" value="80" oninput="gmVol('sfx',this.value)"><span id="sfx-vv">80</span></div>
       </div>
     </div>
@@ -320,6 +320,7 @@ input[type=range]{cursor:pointer;}
         <div class="addrow addrow-a">
           <input class="urlinp" id="bgm-inp" placeholder="YouTube URL 붙여넣기" onkeydown="if(event.key==='Enter')addTrack('bgm')">
           <button class="addbtn addbtn-a" onclick="addTrack('bgm')">+ URL</button>
+          <button class="addbtn addbtn-a" onclick="openPlaylistModal('bgm')" title="재생목록 일괄 추가">📋</button>
         </div>
         <div class="qlist" id="bgm-ql"></div>
       </div>
@@ -328,11 +329,31 @@ input[type=range]{cursor:pointer;}
         <div class="addrow addrow-b">
           <input class="urlinp urlinp-b" id="sfx-inp" placeholder="YouTube URL 붙여넣기" onkeydown="if(event.key==='Enter')addTrack('sfx')">
           <button class="addbtn addbtn-b" onclick="addTrack('sfx')">+ URL</button>
-          <button class="addbtn addbtn-b" onclick="$('sfx-file-inp').click()" title="로컬 파일 (5MB 이하)">📂</button>
-          <input type="file" id="sfx-file-inp" accept="audio/*" multiple style="display:none" onchange="uploadSFXFiles(this)">
+          <button class="addbtn addbtn-b" onclick="openPlaylistModal('sfx')" title="재생목록 일괄 추가">📋</button>
         </div>
         <div class="qlist" id="sfx-ql"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 재생목록 모달 -->
+<div id="pl-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;align-items:center;justify-content:center;">
+  <div style="background:var(--bg1);border:1px solid var(--ba);border-radius:12px;padding:24px;width:min(480px,90vw);max-height:80vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <b style="font-size:1.1em;">📋 재생목록 일괄 추가</b>
+      <button onclick="closePlaylistModal()" style="background:none;border:none;color:var(--fg);font-size:1.3em;cursor:pointer;">✕</button>
+    </div>
+    <div style="font-size:0.85em;color:var(--fg2);">YouTube 재생목록 URL을 붙여넣으면 영상을 한꺼번에 추가해요.</div>
+    <div style="display:flex;gap:8px;">
+      <input id="pl-modal-inp" placeholder="https://www.youtube.com/playlist?list=..." style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--ba);background:var(--bg2);color:var(--fg);font-size:0.9em;" onkeydown="if(event.key==='Enter')fetchPlaylist()">
+      <button onclick="fetchPlaylist()" style="padding:8px 14px;border-radius:8px;border:none;background:var(--a);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap;">불러오기</button>
+    </div>
+    <div id="pl-modal-status" style="font-size:0.85em;color:var(--fg2);min-height:1.2em;"></div>
+    <div id="pl-modal-list" style="display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto;"></div>
+    <div id="pl-modal-footer" style="display:none;gap:8px;justify-content:flex-end;">
+      <span id="pl-modal-count" style="font-size:0.85em;color:var(--fg2);align-self:center;"></span>
+      <button onclick="addAllPlaylist()" style="padding:8px 18px;border-radius:8px;border:none;background:var(--a);color:#fff;font-weight:700;cursor:pointer;">전체 추가</button>
     </div>
   </div>
 </div>
@@ -384,7 +405,7 @@ input[type=range]{cursor:pointer;}
       </div>
     </div>
     <div class="pl-ch pl-ch-b">
-      <div class="ch-hdr ch-hdr-b" style="border-bottom:1px solid var(--bb);"><span class="ch-lbl ch-lbl-b">⚡ SFX</span><span id="pl-sfx-dl" style="font-size:10px;color:var(--b);margin-left:6px;"></span></div>
+      <div class="ch-hdr ch-hdr-b" style="border-bottom:1px solid var(--bb);"><span class="ch-lbl ch-lbl-b">⚡ SFX</span></div>
       <div class="pl-player">
         <div class="novid" id="pl-sfx-novid"><div class="novid-ico">⚡</div><div class="novid-txt">대기 중</div></div>
         <div class="yt-inner" id="pl-sfx-yt"></div>
@@ -426,13 +447,14 @@ function ytId(url){const ps=[/[?&]v=([^&#]+)/,/youtu\.be\/([^?&#]+)/,/youtube\.c
 
 // ── 상태 ──
 const ch={
-  bgm:{player:null,queue:[],idx:-1,playing:false,loop:'loop',timer:null},
-  sfx:{player:null,queue:[],idx:-1,playing:false,loop:'stop',timer:null}
+  bgm:{player:null,queue:[],idx:-1,playing:false,loop:true,timer:null},
+  sfx:{player:null,queue:[],idx:-1,playing:false,loop:true,timer:null}
 };
 let role='',myPeer=null,sessionCode='';
 let plCount=0; // 연결된 PL 수
 // ── Cloudflare Workers WebSocket 시그널링 ──
 const SIG='wss://trpg-signal-production.up.railway.app';
+const YT_API_KEY='AIzaSyCGA44eGXtw7XI2MGLETxz11XZh7rRax8A';
 function mkWS(sid,pid,onMsg,onOpen,onClose,_retry=0){
   const ws=new WebSocket(SIG+'/ws?session='+encodeURIComponent(sid)+'&peer='+encodeURIComponent(pid));
   let opened=false;
@@ -443,28 +465,20 @@ function mkWS(sid,pid,onMsg,onOpen,onClose,_retry=0){
   });
   ws.addEventListener('message',e=>{try{onMsg(JSON.parse(e.data));}catch(err){}});
   ws.addEventListener('close',e=>{
+    (onClose||(()=>{}))(e);
+    // 정상 종료(1000)가 아니면 자동 재연결
     if(!opened||e.code!==1000){
-      // 연결 실패 or 비정상 종료 → 재시도
       if(_retry<5){
-        const delay=Math.min(1000*Math.pow(2,_retry),16000);
-        // PL 화면이면 재연결 중 표시
-        if(role==='pl'){
-          $('pl-conn').textContent=`재연결 중... (${_retry+1}/5)`;
-          $('pl-conn').className='conn-b cb-w';
-        }
+        const delay=Math.min(1000*Math.pow(2,_retry),16000); // 1s,2s,4s,8s,16s
+        toast(`🔄 연결 재시도 중... (${_retry+1}/5)`);
         setTimeout(()=>{
           if(role==='gm'||role==='pl'){
             myPeer=mkWS(sid,pid,onMsg,onOpen,onClose,_retry+1);
           }
         },delay);
       } else {
-        // 5번 다 실패하면 onClose 호출
-        (onClose||(()=>{}))(e);
         toast('❌ 연결 실패. 새로고침 해주세요.');
       }
-    } else {
-      // 정상 종료
-      (onClose||(()=>{}))(e);
     }
   });
   ws.addEventListener('error',()=>{});
@@ -487,6 +501,8 @@ function toggleDrop(id,e){
 }
 function closeAllDrops(){document.querySelectorAll('.drop').forEach(d=>d.classList.remove('open'));}
 document.addEventListener('click',closeAllDrops);
+// 재생목록 모달 외부 클릭 시 닫기
+document.getElementById('pl-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closePlaylistModal();});
 
 // ── YouTube API ──
 let ytReady=false,ytQ=[];
@@ -578,14 +594,11 @@ function gmState(c,e){
     stopTimer(c);
     if(c==='sfx'){
       const item=C.queue[C.idx];
-      if(item&&item.loop) gmPlayIdx(c,C.idx);           // 트랙 루프
-      else if(C.loop==='loop') gmPlayIdx(c,(C.idx+1)%C.queue.length); // 채널 루프
-      // stop이면 멈춤
+      if(item&&item.loop) gmPlayIdx(c,C.idx);
+      else if(C.loop) gmPlayIdx(c,(C.idx+1)%C.queue.length);
+      else gmNext(c);
     } else {
-      // BGM 3단계
-      if(C.loop==='loop') gmPlayIdx(c,C.idx);           // 같은 곡 반복
-      else if(C.loop==='next') gmPlayIdx(c,(C.idx+1)%C.queue.length); // 다음 곡
-      // stop이면 멈춤
+      C.loop?gmPlayIdx(c,C.idx):gmNext(c);
     }
   }
 }
@@ -596,6 +609,89 @@ function gmState(c,e){
 
 
 // ── 큐 ──
+// ── 재생목록 일괄 추가 ──────────────────────────────
+let plModalChannel='bgm';
+let plModalItems=[];
+
+function openPlaylistModal(c){
+  plModalChannel=c;
+  plModalItems=[];
+  $('pl-modal').style.display='flex';
+  $('pl-modal-status').textContent='';
+  $('pl-modal-list').innerHTML='';
+  $('pl-modal-footer').style.display='none';
+  $('pl-modal-inp').value='';
+  setTimeout(()=>$('pl-modal-inp').focus(),100);
+}
+function closePlaylistModal(){
+  $('pl-modal').style.display='none';
+}
+function ytPlaylistId(url){
+  const m=(url||'').match(/[?&]list=([^&#]+)/);
+  return m?m[1]:null;
+}
+async function fetchPlaylist(){
+  const url=$('pl-modal-inp').value.trim();
+  const key=YT_API_KEY;
+  const listId=ytPlaylistId(url);
+  if(!listId){$('pl-modal-status').textContent='❌ 유효한 재생목록 URL이 아닙니다';return;}
+  $('pl-modal-status').textContent='⏳ 불러오는 중...';
+  $('pl-modal-list').innerHTML='';
+  $('pl-modal-footer').style.display='none';
+  plModalItems=[];
+  try{
+    let items=[];
+    let pageToken='';
+    do{
+      const res=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${encodeURIComponent(listId)}&key=${encodeURIComponent(key)}${pageToken?'&pageToken='+pageToken:''}`);
+      if(!res.ok){
+        const err=await res.json();
+        $('pl-modal-status').textContent='❌ '+(err?.error?.message||'API 오류');
+        return;
+      }
+      const data=await res.json();
+      for(const it of data.items||[]){
+        const sn=it.snippet;
+        if(sn?.resourceId?.videoId && sn.title!=='Deleted video' && sn.title!=='Private video'){
+          items.push({id:sn.resourceId.videoId,title:sn.title});
+        }
+      }
+      pageToken=data.nextPageToken||'';
+    }while(pageToken);
+
+    plModalItems=items;
+    $('pl-modal-status').textContent=`✅ ${items.length}개 영상 발견`;
+    const listEl=$('pl-modal-list');
+    listEl.innerHTML='';
+    items.forEach((it,i)=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--ba);font-size:0.85em;';
+      row.innerHTML=`<span style="color:var(--fg2);min-width:1.5em;">${i+1}</span><img src="https://img.youtube.com/vi/${it.id}/default.jpg" style="width:48px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0;"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.title}</span>`;
+      listEl.appendChild(row);
+    });
+    $('pl-modal-count').textContent=`총 ${items.length}개`;
+    $('pl-modal-footer').style.display='flex';
+  }catch(e){
+    $('pl-modal-status').textContent='❌ 네트워크 오류: '+e.message;
+  }
+}
+async function addAllPlaylist(){
+  if(!plModalItems.length)return;
+  const c=plModalChannel;
+  const C=ch[c];
+  let added=0;
+  for(const it of plModalItems){
+    if(C.queue.some(q=>q.id===it.id))continue; // 중복 스킵
+    C.queue.push({id:it.id,title:it.title,memo:''});
+    added++;
+  }
+  renderQ(c);
+  saveScenarios();
+  gmBroadcast(buildSync());
+  closePlaylistModal();
+  toast(`✅ ${added}개 추가됨${added<plModalItems.length?' (중복 제외)':''}`);
+}
+
 async function addTrack(c){
   const inp=$(c+'-inp'),url=inp.value.trim();
   if(!url){toast('URL을 입력하세요');return;}
@@ -618,10 +714,7 @@ function renderQ(c){
     <div class="qi ${i===C.idx?'on-'+c:''}" draggable="true" data-ch="${c}" data-i="${i}" onclick="gmPlayIdx('${c}',${i})">
       <span class="qi-drag">⠿</span>
       <span class="qi-num">${i===C.idx?'▶':i+1}</span>
-      ${item.isLocal
-        ?`<div class="qi-thumb" style="display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--bg3);">🎵</div>`
-        :`<img class="qi-thumb" src="https://img.youtube.com/vi/${item.id}/mqdefault.jpg" onerror="this.style.display='none'">`
-      }
+      <img class="qi-thumb" src="https://img.youtube.com/vi/${item.id}/mqdefault.jpg" onerror="this.style.display='none'">
       <div class="qi-info"><div class="qi-ttl">${item.title}</div>
       <div class="qi-id">${item.id}</div></div>
       <button class="qi-loop ${item.loop?'on':''}" onclick="event.stopPropagation();toggleTL('${c}',${i})">${item.loop?'🔁':'↩'}</button>
@@ -670,11 +763,6 @@ function updateMemo(c,i,val){
   saveSc();
 }
 function delTrack(c,i){
-  const item=ch[c].queue[i];
-  if(item?.isLocal&&c==='sfx'){
-    if(item.localUrl)URL.revokeObjectURL(item.localUrl);
-    delete sfxFiles[item.fileId];
-  }
   ch[c].queue.splice(i,1);
   if(ch[c].idx===i)ch[c].idx=-1;else if(ch[c].idx>i)ch[c].idx--;
   renderQ(c);saveSc();
@@ -698,49 +786,19 @@ function gmPlayIdx(c,i){
   const C=ch[c];
   if(i<0||i>=C.queue.length)return;
   C.idx=i;
-  const item=C.queue[i];
-  renderQ(c);
-
-  // 볼륨이 0이면 70으로 복원
-  const vol=C.player?.getVolume?.()??parseInt($(c+'-vol').value);
-  if(vol===0){
-    const defaultVol=70;
-    if(C.player)C.player.setVolume(defaultVol);
-    $(c+'-vol').value=defaultVol;$(c+'-vv').textContent=defaultVol;
-  }
-
-  if(item.isLocal&&c==='sfx'){
-    playLocalSFXGM(item);
-    return;
-  }
-  stopLocalSFX();
   if(!C.player||!C.player.loadVideoById)return;
-  C.player.loadVideoById(item.id);
-  $(c+'-now').textContent=item.title;
+  C.player.loadVideoById(C.queue[i].id);
+  $(c+'-now').textContent=C.queue[i].title;
   $(c+'-novid').style.display='none';
+  renderQ(c);
 }
-function gmToggle(c){
-  const C=ch[c];
-  if(c==='sfx'&&localSFXAudio){
-    if(C.playing){localSFXAudio.pause();C.playing=false;$('sfx-pb').textContent='▶';}
-    else{localSFXAudio.play();C.playing=true;$('sfx-pb').textContent='⏸';}
-    gmBroadcast(buildSync());return;
-  }
-  if(!C.player)return;C.playing?C.player.pauseVideo():C.player.playVideo();
-}
+function gmToggle(c){const C=ch[c];if(!C.player)return;C.playing?C.player.pauseVideo():C.player.playVideo();}
 function gmNext(c){const C=ch[c];if(C.idx<C.queue.length-1)gmPlayIdx(c,C.idx+1);}
 function gmPrev(c){const C=ch[c];if(C.idx>0)gmPlayIdx(c,C.idx-1);}
 function gmToggleLoop(c){
-  const modes=c==='bgm'?['loop','next','stop']:['loop','stop'];
-  const cur=modes.indexOf(ch[c].loop);
-  ch[c].loop=modes[(cur+1)%modes.length];
-  const icons={loop:'🔁',next:'⏭',stop:'↩'};
-  const cls={loop:c==='bgm'?'on-a':'on-b',next:c==='bgm'?'on-a':'on-b',stop:''};
-  const btn=$(c+'-lb');
-  btn.className='cb2 '+cls[ch[c].loop];
-  btn.textContent=icons[ch[c].loop];
-  const labels={loop:'🔁 같은 곡 반복',next:'⏭ 다음 곡 자동재생',stop:'↩ 1곡 후 멈춤'};
-  toast(labels[ch[c].loop]);
+  ch[c].loop=!ch[c].loop;
+  $(c+'-lb').classList.toggle(c==='bgm'?'on-a':'on-b',ch[c].loop);
+  toast(ch[c].loop?'🔁 채널 루프 ON':'↩ 채널 루프 OFF');
 }
 function gmSeek(c,e){const C=ch[c];if(!C.player)return;const r=e.currentTarget.getBoundingClientRect();C.player.seekTo(((e.clientX-r.left)/r.width)*(C.player.getDuration()||0),true);setTimeout(()=>gmBroadcast(buildSync()),300);}
 function gmVol(c,v){$(c+'-vv').textContent=v;if(ch[c].player)ch[c].player.setVolume(+v);}
@@ -756,123 +814,10 @@ function startTimer(c){
 }
 function stopTimer(c){if(ch[c].timer){clearInterval(ch[c].timer);ch[c].timer=null;}}
 
-// ── SFX 로컬 파일 시스템 (HTTP 업로드 방식) ──
-const SIG_HTTP='https://trpg-signal-production.up.railway.app';
-const MAX_SFX_FILE=5*1024*1024;
-const MAX_SFX_COUNT=20;
-// GM측: fileId → {name, type, localUrl}
-const sfxFiles={};
-// PL측: fileId → ObjectURL
-const plSFXFiles={};
-
-async function uploadSFXFiles(input){
-  const files=Array.from(input.files);
-  input.value='';
-  const localCount=ch.sfx.queue.filter(q=>q.isLocal).length;
-  let added=0;
-  for(const file of files){
-    if(localCount+added>=MAX_SFX_COUNT){toast(`⚠️ 최대 ${MAX_SFX_COUNT}개까지 가능해요`);break;}
-    if(file.size>MAX_SFX_FILE){toast(`❌ ${file.name} — 5MB 초과`);continue;}
-    toast(`📤 ${file.name} 업로드 중...`);
-    try{
-      const res=await fetch(SIG_HTTP+'/upload',{
-        method:'POST',
-        headers:{
-          'Content-Type':file.type||'audio/mpeg',
-          'X-File-Name':encodeURIComponent(file.name),
-          'X-Session-Id':sessionCode,
-        },
-        body:file,
-      });
-      if(!res.ok){toast(`❌ 업로드 실패: ${file.name}`);continue;}
-      const {fileId}=await res.json();
-      const localUrl=URL.createObjectURL(file);
-      sfxFiles[fileId]={name:file.name,type:file.type,localUrl};
-      const item={id:fileId,title:file.name,loop:false,isLocal:true,fileId,localUrl};
-      ch.sfx.queue.push(item);
-      added++;
-      toast(`✅ ${file.name} 업로드 완료!`);
-      renderQ('sfx');saveSc();
-    }catch(e){toast(`❌ 업로드 오류: ${file.name}`);}
-  }
-}
-
-// GM 로컬 SFX 오디오 관리
-let localSFXAudio=null;
-function stopLocalSFX(){if(localSFXAudio){localSFXAudio.pause();localSFXAudio=null;}}
-
-function playLocalSFXGM(item){
-  stopLocalSFX();
-  // 큐에서 현재 item 참조 (루프 상태가 바뀌었을 수 있으므로)
-  const currentItem=ch.sfx.queue[ch.sfx.idx]||item;
-  const audio=new Audio(currentItem.localUrl);
-  audio.volume=parseInt($('sfx-vol').value)/100;
-  audio.loop=false; // ended 이벤트로 직접 처리
-  audio.play().catch(e=>toast('재생 오류: '+e.message));
-  localSFXAudio=audio;
-  ch.sfx.playing=true;$('sfx-pb').textContent='⏸';
-  $('sfx-now').textContent=currentItem.title;
-  $('sfx-novid').style.display='none';
-  // 진행바
-  if(ch.sfx.timer)clearInterval(ch.sfx.timer);
-  ch.sfx.timer=setInterval(()=>{
-    if(!localSFXAudio)return;
-    const cur=localSFXAudio.currentTime||0,dur=localSFXAudio.duration||0;
-    $('sfx-pf').style.width=(dur?cur/dur*100:0)+'%';
-    $('sfx-cur').textContent=fmt(cur);$('sfx-dur').textContent=fmt(dur);
-  },500);
-  audio.addEventListener('ended',()=>{
-    ch.sfx.playing=false;$('sfx-pb').textContent='▶';
-    clearInterval(ch.sfx.timer);ch.sfx.timer=null;
-    const latestItem=ch.sfx.queue[ch.sfx.idx];
-    if(latestItem?.loop){
-      playLocalSFXGM(latestItem);
-    } else if(ch.sfx.loop==='loop'){
-      gmPlayIdx('sfx',(ch.sfx.idx+1)%ch.sfx.queue.length);
-    }
-  });
-  gmBroadcast(buildSync());
-}
-
-// PL측 SFX 다운로드 및 재생
-async function plDownloadAndPlaySFX(fileId,title){
-  const el=$('pl-sfx-dl');
-  // 이미 다운로드됐으면 바로 재생
-  if(plSFXFiles[fileId]){plPlaySFX(fileId);return;}
-  if(el)el.textContent='📥 다운로드 중...';
-  try{
-    const res=await fetch(SIG_HTTP+'/file/'+fileId);
-    if(!res.ok){if(el)el.textContent='';toast('❌ SFX 파일 없음');return;}
-    const blob=await res.blob();
-    plSFXFiles[fileId]=URL.createObjectURL(blob);
-    if(el)el.textContent='';
-    plPlaySFX(fileId);
-  }catch(e){if(el)el.textContent='';toast('❌ 다운로드 실패');}
-}
-
-function plPlaySFX(fileId){
-  const url=plSFXFiles[fileId];if(!url)return;
-  const audio=new Audio(url);
-  audio.volume=parseInt($('pl-sfx-vol').value)/100;
-  audio.play().catch(()=>{});
-  $('pl-sfx-novid').style.display='none';
-}
-
-function buildSync(){
-  const snap=c=>{
-    const C=ch[c],item=C.idx>=0?C.queue[C.idx]:null;
-    const isLocal=item?.isLocal&&c==='sfx';
-    const cur=isLocal?(localSFXAudio?.currentTime||0):(C.player?.getCurrentTime?.()||0);
-    return{playing:C.playing,videoId:item&&!isLocal?item.id:'',fileId:isLocal?item.fileId:'',title:item?item.title:'',time:cur,ts:Date.now()};
-  };
-  return{type:'sync',bgm:snap('bgm'),sfx:snap('sfx'),ts:Date.now()};
-}
+function buildSync(){const snap=c=>{const C=ch[c];return{playing:C.playing,videoId:C.idx>=0?C.queue[C.idx].id:'',title:C.idx>=0?C.queue[C.idx].title:'',time:C.player?.getCurrentTime?.()||0,ts:Date.now()};};return{type:'sync',bgm:snap('bgm'),sfx:snap('sfx'),ts:Date.now()};}
 function gmBroadcast(msg){wsSend(myPeer,msg);}
 function gmForceSync(){gmBroadcast(buildSync());toast('🔄 동기화 전송');}
-function copyCode(){
-  const link=location.origin+location.pathname+'?join='+sessionCode;
-  navigator.clipboard.writeText(link).then(()=>toast('🔗 참가 링크 복사됨!'));
-}
+function copyCode(){navigator.clipboard.writeText(sessionCode).then(()=>toast('📋 코드 복사: '+sessionCode));}
 
 // ── PL ──
 let plAudioUnlocked=false;
@@ -915,7 +860,6 @@ function joinPL(){
   myPeer=mkWS(code,plId,
     msg=>{
       if(msg.type==='sync'){plHandle(msg);}
-      else if(msg.type==='fadeout'){plFadeOut(msg.ch);}
       else if(msg.type==='peer-join'&&msg.peerId==='GM'){
         wsSend(myPeer,{type:'sync-req',to:'GM'});
       }
@@ -992,43 +936,6 @@ function plUnlockAudio(){
   }
 }
 
-const plFadeTimers={bgm:null,sfx:null};
-
-function plFadeIn(c,dur=3){
-  const p=plP[c];if(!p)return;
-  const target=70;
-  if(plFadeTimers[c]){clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;}
-  p.setVolume(1);
-  const step=(target-1)/(dur*20);
-  plFadeTimers[c]=setInterval(()=>{
-    const v=p.getVolume?.()??1;
-    if(v+step>=target){
-      p.setVolume(target);
-      $('pl-'+c+'-vol').value=target;$('pl-'+c+'-vv').textContent=target;
-      clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;
-    } else {
-      p.setVolume(v+step);
-    }
-  },50);
-}
-
-function plFadeOut(c,dur=3){
-  const p=plP[c];if(!p)return;
-  const start=p.getVolume?.()??70;
-  const step=start/(dur*20);
-  if(plFadeTimers[c]){clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;}
-  plFadeTimers[c]=setInterval(()=>{
-    const v=p.getVolume?.()??0;
-    if(v-step<=0){
-      p.setVolume(0);p.pauseVideo?.();
-      $('pl-'+c+'-vol').value=0;$('pl-'+c+'-vv').textContent=0;
-      clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;
-    } else {
-      p.setVolume(v-step);
-    }
-  },50);
-}
-
 function plHandle(d){
   if(!d||d.type!=='sync')return;
   plLastSync=d;
@@ -1044,18 +951,11 @@ function plHandle(d){
 function plApply(c,s){
   if(!s)return;
   if(s.title)$('pl-'+c+'-ttl').textContent=s.title;
-
-  // 로컬 SFX — 서버에서 HTTP 다운로드 후 재생
-  if(s.fileId&&c==='sfx'){
-    if(s.playing) plDownloadAndPlaySFX(s.fileId,s.title);
-    return;
-  }
-
   const p=plP[c];if(!p?.loadVideoById)return;
   const st=plSt[c];
   if(s.videoId&&s.videoId!==st.vid){
     st.vid=s.videoId;
-    if(s.playing){p.loadVideoById({videoId:s.videoId,startSeconds:s.time||0});plFadeIn(c);}
+    if(s.playing){p.loadVideoById({videoId:s.videoId,startSeconds:s.time||0});}
     else{p.cueVideoById({videoId:s.videoId,startSeconds:s.time||0});}
     $('pl-'+c+'-novid').style.display='none';
   } else if(s.videoId&&s.ts!==st.ts){
@@ -1095,10 +995,9 @@ function loadSc(id){
 function renderScDrop(){
   const el=$('sc-drop');if(!el)return;
   el.innerHTML=scenarios.map(sc=>`
-    <div class="drop-opt ${sc.id===curSc?'active':''}" onclick="switchSc('${sc.id}')" id="sc-opt-${sc.id}">
+    <div class="drop-opt ${sc.id===curSc?'active':''}" onclick="switchSc('${sc.id}')">
       <span style="min-width:10px">${sc.id===curSc?'▶':''}</span>
-      <span style="flex:1" id="sc-lbl-${sc.id}">${sc.name}</span>
-      <button class="drop-del" style="opacity:1;color:var(--muted);font-size:11px;" onclick="renameSc('${sc.id}',event)" title="이름 변경">✏️</button>
+      <span style="flex:1">${sc.name}</span>
       <button class="drop-del" onclick="deleteSc('${sc.id}',event)">✕</button>
     </div>`).join('')+
     `<div class="drop-div"></div>
@@ -1106,40 +1005,8 @@ function renderScDrop(){
        <input id="sc-new-inp" style="flex:1;padding:4px 7px;background:var(--bg2);border:1px solid var(--ba);border-radius:4px;color:var(--text);font-size:11px;font-family:inherit;outline:none;" placeholder="새 시나리오 이름" onkeydown="if(event.key==='Enter')newSc()" onclick="event.stopPropagation()">
        <button style="padding:4px 8px;border:none;border-radius:4px;background:var(--a);color:#1a1200;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;" onclick="newSc(event)">추가</button>
      </div>`;
+  // 입력창 자동 포커스
   setTimeout(()=>{const inp=$('sc-new-inp');if(inp)inp.focus();},50);
-}
-
-function renameSc(id,e){
-  e.stopPropagation();
-  const sc=scenarios.find(s=>s.id===id);if(!sc)return;
-  const lbl=$('sc-lbl-'+id);if(!lbl)return;
-  const opt=$('sc-opt-'+id);
-
-  // 인라인 입력창으로 교체
-  const inp=document.createElement('input');
-  inp.value=sc.name;
-  inp.style.cssText='flex:1;padding:2px 5px;background:var(--bg2);border:1px solid var(--a);border-radius:4px;color:var(--text);font-size:11px;font-family:inherit;outline:none;';
-  inp.onclick=e=>e.stopPropagation();
-
-  const confirm=()=>{
-    const newName=inp.value.trim();
-    if(newName&&newName!==sc.name){
-      sc.name=newName;
-      persist();
-      if(curSc===id)$('sc-name').textContent=newName;
-      toast('✏️ 이름 변경됨: '+newName);
-    }
-    renderScDrop();
-  };
-  inp.onkeydown=e=>{
-    e.stopPropagation();
-    if(e.key==='Enter')confirm();
-    if(e.key==='Escape')renderScDrop();
-  };
-  inp.onblur=confirm;
-
-  lbl.replaceWith(inp);
-  inp.focus();inp.select();
 }
 function switchSc(id){
   saveSc();loadSc(id);closeAllDrops();
@@ -1191,8 +1058,8 @@ document.addEventListener('keydown',e=>{
     case'ArrowRight':e.preventDefault();gmNext('bgm');break;
     case'ArrowUp':e.preventDefault();gmPrev('sfx');break;
     case'ArrowDown':e.preventDefault();gmNext('sfx');break;
-    case'f':case'F':fadeCh('bgm');gmBroadcast({type:'fadeout',ch:'bgm'});toast('🎵 BGM 페이드아웃');break;
-    case'g':case'G':fadeCh('sfx');gmBroadcast({type:'fadeout',ch:'sfx'});toast('⚡ SFX 페이드아웃');break;
+    case'f':case'F':fadeCh('bgm');toast('🎵 BGM 페이드아웃');break;
+    case'g':case'G':fadeCh('sfx');toast('⚡ SFX 페이드아웃');break;
     case'm':case'M':
       isMuted=!isMuted;
       ['bgm','sfx'].forEach(c=>{
@@ -1343,17 +1210,6 @@ $('jcode').addEventListener('keydown',e=>{if(e.key==='Enter')joinPL();});
 // 시작 화면에서 GM 수 표시 + 30초마다 갱신
 fetchGMCount();
 setInterval(()=>{if($('ss').style.display!=='none')fetchGMCount();},30000);
-
-// URL ?join=코드 파라미터 감지 → 자동 PL 참가
-(()=>{
-  const params=new URLSearchParams(location.search);
-  const joinCode=params.get('join');
-  if(joinCode){
-    $('jcode').value=joinCode.toUpperCase();
-    showJoin();
-    setTimeout(()=>joinPL(),800);
-  }
-})();
 </script>
 </body>
 </html>
