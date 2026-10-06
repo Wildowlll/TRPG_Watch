@@ -268,7 +268,7 @@ input[type=range]{cursor:pointer;}
         </button>
         <div class="drop drop-r" id="td-gm"></div>
       </div>
-      <button class="btn btn-g" style="font-size:11px;" onclick="copyCode()">🔗 복사</button>
+      <button class="btn btn-g" style="font-size:11px;" onclick="copyJoinLink()">🔗 링크복사</button>
       <button class="btn btn-g" style="font-size:11px;" onclick="gmForceSync()">🔄 동기화</button>
       <button class="btn btn-g" style="font-size:11px;" onclick="exportScenarios()" title="시나리오 전체 저장">💾 저장</button>
       <button class="btn btn-g" style="font-size:11px;" onclick="$('import-file').click()" title="시나리오 불러오기">📂 불러오기</button>
@@ -828,6 +828,10 @@ function buildSync(){const snap=c=>{const C=ch[c];return{playing:C.playing,video
 function gmBroadcast(msg){wsSend(myPeer,msg);}
 function gmForceSync(){gmBroadcast(buildSync());toast('🔄 동기화 전송');}
 function copyCode(){navigator.clipboard.writeText(sessionCode).then(()=>toast('📋 코드 복사: '+sessionCode));}
+function copyJoinLink(){
+  const url=location.origin+location.pathname+'?join='+sessionCode;
+  navigator.clipboard.writeText(url).then(()=>toast('🔗 참가 링크 복사됨!'));
+}
 
 // ── PL ──
 let plAudioUnlocked=false;
