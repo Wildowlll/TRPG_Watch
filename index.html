@@ -790,6 +790,11 @@ function gmPlayIdx(c,i){
   if(i<0||i>=C.queue.length)return;
   C.idx=i;
   if(!C.player||!C.player.loadVideoById)return;
+  // 볼륨이 0이면 70으로 자동 복원
+  if((C.player.getVolume?.()??70)===0){
+    C.player.setVolume(70);
+    $(c+'-vol').value=70;$(c+'-vv').textContent=70;
+  }
   C.player.loadVideoById(C.queue[i].id);
   $(c+'-now').textContent=C.queue[i].title;
   $(c+'-novid').style.display='none';
@@ -874,6 +879,7 @@ function joinPL(){
   myPeer=mkWS(code,plId,
     msg=>{
       if(msg.type==='sync'){plHandle(msg);}
+      else if(msg.type==='fadeout'){plFadeOut(msg.ch);}
       else if(msg.type==='peer-join'&&msg.peerId==='GM'){
         wsSend(myPeer,{type:'sync-req',to:'GM'});
       }
@@ -981,6 +987,25 @@ function plApply(c,s){
 }
 function plVol(c,v){$('pl-'+c+'-vv').textContent=v;if(plP[c])plP[c].setVolume(+v);}
 
+// PL 페이드아웃 (GM F/G 키 연동)
+const plFadeTimers={bgm:null,sfx:null};
+function plFadeOut(c,dur=3){
+  const p=plP[c];if(!p)return;
+  const start=p.getVolume?.()??70;
+  const step=start/(dur*20);
+  if(plFadeTimers[c]){clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;}
+  plFadeTimers[c]=setInterval(()=>{
+    const v=p.getVolume?.()??0;
+    if(v-step<=0){
+      p.setVolume(0);p.pauseVideo?.();
+      $('pl-'+c+'-vol').value=0;$('pl-'+c+'-vv').textContent=0;
+      clearInterval(plFadeTimers[c]);plFadeTimers[c]=null;
+    } else {
+      p.setVolume(v-step);
+    }
+  },50);
+}
+
 // ── 시나리오 ──
 const SC_KEY='trpg-sc-v5';
 let scenarios=[],curSc='';
@@ -1006,12 +1031,20 @@ function loadSc(id){
   $('sc-name').textContent=sc.name;
   renderQ('bgm');renderQ('sfx');
 }
+function renameSc(id,e){
+  e.stopPropagation();
+  const sc=scenarios.find(s=>s.id===id);if(!sc)return;
+  const name=prompt('시나리오 이름 변경',sc.name);
+  if(!name||!name.trim())return;
+  sc.name=name.trim();persist();renderScDrop();toast('✏️ 이름 변경: '+sc.name);
+}
 function renderScDrop(){
   const el=$('sc-drop');if(!el)return;
   el.innerHTML=scenarios.map(sc=>`
     <div class="drop-opt ${sc.id===curSc?'active':''}" onclick="switchSc('${sc.id}')">
       <span style="min-width:10px">${sc.id===curSc?'▶':''}</span>
       <span style="flex:1">${sc.name}</span>
+      <button class="drop-del" style="margin-right:2px;font-size:12px;" onclick="renameSc('${sc.id}',event)" title="이름 수정">✏️</button>
       <button class="drop-del" onclick="deleteSc('${sc.id}',event)">✕</button>
     </div>`).join('')+
     `<div class="drop-div"></div>
@@ -1072,8 +1105,8 @@ document.addEventListener('keydown',e=>{
     case'ArrowRight':e.preventDefault();gmNext('bgm');break;
     case'ArrowUp':e.preventDefault();gmPrev('sfx');break;
     case'ArrowDown':e.preventDefault();gmNext('sfx');break;
-    case'f':case'F':fadeCh('bgm');toast('🎵 BGM 페이드아웃');break;
-    case'g':case'G':fadeCh('sfx');toast('⚡ SFX 페이드아웃');break;
+    case'f':case'F':fadeCh('bgm');gmBroadcast({type:'fadeout',ch:'bgm'});toast('🎵 BGM 페이드아웃');break;
+    case'g':case'G':fadeCh('sfx');gmBroadcast({type:'fadeout',ch:'sfx'});toast('⚡ SFX 페이드아웃');break;
     case'm':case'M':
       isMuted=!isMuted;
       ['bgm','sfx'].forEach(c=>{
@@ -1224,6 +1257,18 @@ $('jcode').addEventListener('keydown',e=>{if(e.key==='Enter')joinPL();});
 // 시작 화면에서 GM 수 표시 + 30초마다 갱신
 fetchGMCount();
 setInterval(()=>{if($('ss').style.display!=='none')fetchGMCount();},30000);
+
+// 참가 링크 자동 처리: ?join=ABCDEF
+(function(){
+  const params=new URLSearchParams(location.search);
+  const code=params.get('join');
+  if(code){
+    showJoin();
+    $('jcode').value=code.toUpperCase().slice(0,6);
+    // 약간 딜레이 후 자동 참가 (UI 렌더링 대기)
+    setTimeout(()=>joinPL(),300);
+  }
+})();
 </script>
 </body>
 </html>
